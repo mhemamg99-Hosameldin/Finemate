@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Journal Entries</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Chart.js for small summary chart -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --blue-900:#0b3d91;
+      --blue-700:#1464c9;
+      --blue-500:#2a9df4;
+      --muted:#6b7280;
+      --panel:#ffffff;
+      --bg:#f4f7fb;
+      --accent:#17a2b8;
+    }
+    [data-theme="dark"]{
+      --bg:#071226;
+      --panel:#0f1724;
+      --muted:#9ca3af;
+      --blue-900:#071733;
+      --blue-700:#0a3a6b;
+      --blue-500:#1f6fb3;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg), #e9f7ff 280px); color:#071227;
+      min-height:100vh; --sidebar-w:260px;
+      transition: background .25s, color .25s;
+    }
+    [data-theme="dark"] body{ color:#e6eef8; }
+
+    .app{ display:flex; min-height:100vh; }
+
+    /* Sidebar */
+    .sidebar{
+      width:var(--sidebar-w);
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color: #fff;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      position:fixed;
+      left:0; top:0; bottom:0;
+      box-shadow: 0 6px 24px rgba(10,25,60,0.12);
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem; color: #fff; transform:translateY(-1px) }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+    /* Main */
+    .main{ margin-left:var(--sidebar-w); padding:22px; width:calc(100% - var(--sidebar-w)); transition:margin .25s; }
+
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+    .search{ display:flex; gap:8px; align-items:center; max-width:540px; width:100%; }
+    .search input{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(11,18,32,0.06); background:var(--panel); }
+
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:9px; cursor:pointer; border:none; font-weight:600; }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; }
+    .btn-ghost{ background:transparent; border:1px solid rgba(11,18,32,0.06); color:var(--muted) }
+    .icon-btn{ background:var(--panel); padding:8px; border-radius:10px; border:1px solid rgba(11,18,32,0.05) }
+
+    .grid{ display:grid; grid-template-columns: repeat(12,1fr); gap:16px; align-items:start; }
+
+    .card{ background:var(--panel); border-radius:12px; padding:14px; box-shadow: 0 6px 20px rgba(16,24,40,0.04); transition: transform .25s; overflow:hidden;}
+    .card:hover{ transform:translateY(-6px); box-shadow: 0 16px 36px rgba(16,24,40,0.08); }
+
+    .stat{ grid-column: span 3; display:flex; gap:12px; align-items:center;}
+    .badge{ width:54px; height:54px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,var(--blue-500),var(--blue-700)); color:#fff; font-size:1.2rem }
+
+    /* Journal layout */
+    .entries-table{ grid-column: span 8; min-height:300px; }
+    .journal-side{ grid-column: span 4; }
+
+    table{ width:100%; border-collapse:collapse; font-size:.95rem; }
+    thead th{ text-align:left; color:var(--muted); font-weight:700; padding:10px; font-size:.85rem; border-bottom:1px solid rgba(0,0,0,0.04); }
+    tbody tr{ transition: background .18s, transform .18s; border-bottom:1px solid rgba(0,0,0,0.04) }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform: translateX(6px); }
+    td{ padding:10px; vertical-align:middle; }
+
+    .pill { padding:6px 10px; border-radius:999px; font-weight:700; color:#fff; display:inline-block; font-size:.85rem;}
+    .status-cleared{ background:linear-gradient(135deg,#34d399,#10b981) }
+    .status-pending{ background:linear-gradient(135deg,#f97316,#f59e0b) }
+    .status-overdue{ background:linear-gradient(135deg,#ef4444,#fb7185) }
+
+    /* modal (entry creation) */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(3,6,23,0.45); display:none; align-items:center; justify-content:center; padding:16px; z-index:60; }
+    .modal{ width:100%; max-width:920px; background:var(--panel); border-radius:12px; padding:18px; box-shadow:0 10px 40px rgba(2,6,23,0.4); max-height:90vh; overflow:auto; }
+    .form-row{ display:flex; gap:8px; flex-wrap:wrap }
+    .form-group{ flex:1; min-width:160px; display:flex; flex-direction:column; gap:6px }
+    .form-group input, select, textarea{ padding:10px; border-radius:8px; border:1px solid rgba(11,18,32,0.06); }
+
+    .lines { margin-top:8px; display:flex; flex-direction:column; gap:8px }
+    .line-row{ display:flex; gap:8px; align-items:center; }
+    .line-row select, .line-row input{ padding:8px; border-radius:8px; border:1px solid rgba(11,18,32,0.06) }
+    .line-row .amount{ width:130px }
+
+    .sum-row{ display:flex; justify-content:flex-end; gap:12px; margin-top:8px; align-items:center }
+
+    .chart-box{ height:220px }
+
+    .page-footer{ grid-column:1 / -1; text-align:center; padding:14px 0; color:var(--muted) }
+
+    @media (max-width:1100px){
+      :root{ --sidebar-w:72px }
+      .sidebar{ width:var(--sidebar-w) }
+      .brand span{ display:none }
+      .main{ margin-left:var(--sidebar-w) }
+      .stat{ grid-column: span 6 }
+      .entries-table{ grid-column: span 12 }
+      .journal-side{ grid-column: span 12 }
+    }
+  </style>
+</head>
+
+<body data-theme="light">
+<div class="app" id="app">
+
+   <!-- SIDEBAR -->
+   <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i> <span>BlueFactory</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link"><i class="fa-solid fa-grid"></i> <span>Dashboard</span></a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> <span>Invoices</span></a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> <span>Inventory</span></a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> <span>Reports</span></a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-users"></i> <span>Suppliers</span></a>
+      <a href="customers.html" class="nav-link"><i class="fa-solid fa-handshake"></i> <span>Customers</span></a>
+      <a href="Chart of Accounts.html" class="nav-link active"><i class="fa-solid fa-sitemap"></i> <span>Chart of Accounts</span></a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-book"></i> <span>Journal Entries</span></a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-cart-plus"></i> <span>Purchase Orders</span></a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-lines"></i> <span>Sales Orders</span></a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-credit-card"></i> <span>Payments</span></a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> <span>Payroll</span></a>
+      <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> <span>Tax Management</span></a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building"></i> <span>Assets Management</span></a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> <span>Audit Logs</span></a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> <span>Multi-Currency</span></a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> <span>Notifications Center</span></a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> <span>Settings</span></a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="small-badge"><i class="fa-solid fa-circle-info"></i></div>
+      <div>
+        <div style="font-weight:700">Factory #12</div>
+        <div style="font-size:.85rem;opacity:.95">Enterprise plan</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main" role="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2 style="margin:0">Journal Entries</h2>
+        <div style="color:var(--muted)">Record and manage accounting journal entries</div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="search">
+          <input id="globalSearch" placeholder="Search reference, account, notes..." />
+        </div>
+
+        <input id="fromDate" type="date" class="btn btn-ghost" title="From" />
+        <input id="toDate" type="date" class="btn btn-ghost" title="To" />
+        <select id="typeFilter" class="btn btn-ghost">
+          <option value="all">All types</option>
+          <option value="journal">Journal</option>
+          <option value="adjustment">Adjustment</option>
+          <option value="reversal">Reversal</option>
+        </select>
+
+        <button class="btn icon-btn" id="importJournal" title="Import JSON"><i class="fa-solid fa-file-import"></i></button>
+        <button class="btn icon-btn" id="exportJournal" title="Export CSV"><i class="fa-solid fa-file-csv"></i></button>
+        <button class="btn btn-primary" id="openEntryModal"><i class="fa-solid fa-plus"></i> New Entry</button>
+        <button class="btn icon-btn" id="themeToggle" title="Toggle theme"><i class="fa-regular fa-moon"></i></button>
+      </div>
+    </div>
+
+    <section class="grid">
+
+      <!-- stats -->
+      <div class="stat card">
+        <div class="badge"><i class="fa-solid fa-book"></i></div>
+        <div>
+          <h4 id="statCount">0</h4><p>Entries</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#34d399,#10b981)"><i class="fa-solid fa-circle-check"></i></div>
+        <div><h4 id="statCleared">0</h4><p>Cleared</p></div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#f97316,#f59e0b)"><i class="fa-solid fa-clock"></i></div>
+        <div><h4 id="statPending">0</h4><p>Pending</p></div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)"><i class="fa-solid fa-dollar-sign"></i></div>
+        <div><h4 id="statTotal">$0</h4><p>Total (Debits)</p></div>
+      </div>
+
+      <!-- entries table -->
+      <div class="entries-table card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div><strong>Recent Journal Entries</strong><div class="muted" style="font-size:.92rem">Latest transactions</div></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost" onclick="clearFilters()">Clear filters</button>
+            <button class="btn btn-ghost" onclick="bulkDelete()">Delete All</button>
+          </div>
+        </div>
+
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr><th>Date</th><th>Ref</th><th>Type</th><th>Lines</th><th>Debit</th><th>Credit</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="entriesBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- right side: chart and shortcuts -->
+      <aside class="journal-side card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>Summary (Last 30)</strong><div class="muted" style="font-size:.9rem">Debits vs Credits</div></div>
+          <button class="btn btn-ghost" onclick="updateChart()">Refresh</button>
+        </div>
+
+        <div class="chart-box" style="margin-top:12px"><canvas id="dcChart"></canvas></div>
+
+        <hr style="margin:12px 0">
+
+        <strong>Quick tips</strong>
+        <ul class="muted" style="padding-left:18px">
+          <li>Debits must equal credits to save an entry.</li>
+          <li>Use types to tag adjustments / reversals.</li>
+          <li>Import/Export JSON/CSV for backups.</li>
+        </ul>
+      </aside>
+
+      <div class="page-footer">© 2025 BlueFactory · Accounting for Manufacturers</div>
+    </section>
+  </main>
+</div>
+
+<!-- Modal for creating/editing entry -->
+<div class="modal-backdrop" id="entryModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3 id="entryTitle">New Journal Entry</h3>
+    <div class="muted" style="margin-bottom:12px">Create debit/credit lines. Debits must equal credits.</div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Date</label>
+        <input id="entryDate" type="date" />
+      </div>
+      <div class="form-group">
+        <label>Reference</label>
+        <input id="entryRef" placeholder="e.g. JNL-2025-001" />
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select id="entryType"><option value="journal">Journal</option><option value="adjustment">Adjustment</option><option value="reversal">Reversal</option></select>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="entryStatus"><option value="Pending">Pending</option><option value="Cleared">Cleared</option></select>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <strong>Lines</strong>
+      <div class="lines" id="linesContainer">
+        <!-- dynamic lines -->
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-ghost" id="addLineBtn"><i class="fa-solid fa-plus"></i> Add Line</button>
+        <button class="btn btn-ghost" id="autoBalanceBtn" title="Auto-balance to make debits=credits">Auto-balance</button>
+      </div>
+
+      <div class="sum-row">
+        <div class="muted">Total Debit: <strong id="totalDebit">$0</strong></div>
+        <div class="muted">Total Credit: <strong id="totalCredit">$0</strong></div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+      <button class="btn btn-ghost" id="closeEntry">Cancel</button>
+      <button class="btn btn-primary" id="saveEntry">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================
+   Data storage (localStorage)
+   ============================ */
+const LS_ENTRIES = 'bf_journal_entries_v1';
+const LS_ACCOUNTS = 'bf_coa_v1'; // reuses accounts if available
+
+let entries = [];
+let accounts = [];
+
+/* sample accounts fallback */
+const sampleAccounts = [
+  { id:'1000', number:'1000', name:'Cash', type:'Asset' },
+  { id:'1010', number:'1010', name:'Accounts Receivable', type:'Asset' },
+  { id:'2000', number:'2000', name:'Accounts Payable', type:'Liability' },
+  { id:'4000', number:'4000', name:'Sales Revenue', type:'Income' },
+  { id:'5000', number:'5000', name:'COGS', type:'Expense' },
+  { id:'5100', number:'5100', name:'Office Supplies', type:'Expense' }
+];
+
+function loadData(){
+  const rawEntries = localStorage.getItem(LS_ENTRIES);
+  entries = rawEntries ? JSON.parse(rawEntries) : [];
+  const rawAccounts = localStorage.getItem(LS_ACCOUNTS);
+  accounts = rawAccounts ? JSON.parse(rawAccounts) : sampleAccounts.slice();
+}
+function saveEntries(){ localStorage.setItem(LS_ENTRIES, JSON.stringify(entries)); renderEntries(); updateStats(); updateChart(); }
+
+/* Utility */
+function uid(){ return 'e'+Math.random().toString(36).slice(2,9); }
+function fmt(v){ return v === 0 ? '-' : '$' + Number(v).toLocaleString(); }
+
+/* ============================
+   Render entries table
+   ============================ */
+const entriesBody = document.getElementById('entriesBody');
+function renderEntries(filterText='', from=null, to=null, type='all'){
+  entriesBody.innerHTML = '';
+  const q = (filterText||'').trim().toLowerCase();
+  const rows = entries
+    .filter(e => (type==='all' || e.type === type))
+    .filter(e => !q || (e.ref+' '+e.notes+' '+e.lines.map(l=>l.accountName).join(' ')).toLowerCase().includes(q))
+    .filter(e => {
+      if(from && e.date < from) return false;
+      if(to && e.date > to) return false;
+      return true;
+    })
+    .sort((a,b)=> b.date.localeCompare(a.date));
+
+  rows.forEach(e=>{
+    const totalDebit = e.lines.reduce((s,l)=> s + (l.debit||0), 0);
+    const totalCredit = e.lines.reduce((s,l)=> s + (l.credit||0), 0);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${e.date}</td>
+      <td>${e.ref || ''}</td>
+      <td style="text-transform:capitalize">${e.type}</td>
+      <td>
+        ${e.lines.map(l => `<div style="font-weight:700">${l.accountName || l.account || '(no account)'}</div>
+           <div class="muted" style="font-size:.85rem">${l.desc || ''}</div>`).join('')}
+      </td>
+      <td style="color:#0b6623">${fmt(totalDebit)}</td>
+      <td style="color:#b91c1c">${fmt(totalCredit)}</td>
+      <td><span class="pill ${e.status==='Cleared'?'status-cleared': e.status==='Pending'?'status-pending':'status-overdue'}">${e.status}</span></td>
+      <td>
+        <button class="btn btn-ghost" onclick="editEntry('${e.id}')"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn btn-ghost" onclick="deleteEntry('${e.id}')"><i class="fa-solid fa-trash"></i></button>
+        <button class="btn btn-ghost" onclick="duplicateEntry('${e.id}')"><i class="fa-solid fa-copy"></i></button>
+      </td>
+    `;
+    entriesBody.appendChild(tr);
+  });
+
+  document.getElementById('statCount').textContent = entries.length;
+}
+
+/* ============================
+   Stats & chart
+   ============================ */
+function updateStats(){
+  const cleared = entries.filter(e=> e.status==='Cleared').length;
+  const pending = entries.filter(e=> e.status==='Pending').length;
+  document.getElementById('statCleared').textContent = cleared;
+  document.getElementById('statPending').textContent = pending;
+  const totalDebit = entries.reduce((s,e)=> s + e.lines.reduce((a,l)=> a + (l.debit||0),0), 0);
+  document.getElementById('statTotal').textContent = '$' + totalDebit.toLocaleString();
+}
+
+/* Chart */
+let dcChart = null;
+function updateChart(){
+  const last = entries.slice(-30);
+  const totalDebits = last.reduce((s,e)=> s + e.lines.reduce((a,l)=> a + (l.debit||0),0),0);
+  const totalCredits = last.reduce((s,e)=> s + e.lines.reduce((a,l)=> a + (l.credit||0),0),0);
+  const ctx = document.getElementById('dcChart').getContext('2d');
+  if(dcChart) dcChart.destroy();
+  dcChart = new Chart(ctx, {
+    type:'doughnut',
+    data:{
+      labels:['Debits','Credits'],
+      datasets:[{ data:[totalDebits, totalCredits], backgroundColor:['#2a9df4','#ef4444'] }]
+    },
+    options:{ plugins:{ legend:{ position:'bottom' } } }
+  });
+}
+
+/* ============================
+   Entry modal — dynamic lines
+   ============================ */
+const entryModal = document.getElementById('entryModal');
+const openEntryModalBtn = document.getElementById('openEntryModal');
+const closeEntryBtn = document.getElementById('closeEntry');
+const saveEntryBtn = document.getElementById('saveEntry');
+const addLineBtn = document.getElementById('addLineBtn');
+const autoBalanceBtn = document.getElementById('autoBalanceBtn');
+
+const linesContainer = document.getElementById('linesContainer');
+
+let editingEntryId = null;
+
+function openModal(){
+  populateAccountOptions();
+  entryModal.style.display = 'flex';
+  entryModal.setAttribute('aria-hidden','false');
+  clearEntryForm();
+}
+function closeModal(){ entryModal.style.display = 'none'; entryModal.setAttribute('aria-hidden','true'); editingEntryId = null; }
+
+openEntryModalBtn.addEventListener('click', ()=>{ clearEntryForm(); openModal(); document.getElementById('entryTitle').textContent = 'New Journal Entry'; });
+
+closeEntryBtn.addEventListener('click', closeModal);
+entryModal.addEventListener('click', (e)=>{ if(e.target === entryModal) closeModal(); });
+
+function clearEntryForm(){
+  document.getElementById('entryDate').valueAsDate = new Date();
+  document.getElementById('entryRef').value = 'JNL-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.floor(Math.random()*900+100);
+  document.getElementById('entryType').value = 'journal';
+  document.getElementById('entryStatus').value = 'Pending';
+  linesContainer.innerHTML = '';
+  addLine(); addLine(); // start with two lines
+  recalcTotals();
+}
+
+/* populate accounts select */
+function populateAccountOptions(){
+  // ensure accounts loaded
+  if(!accounts || accounts.length===0) accounts = sampleAccounts.slice();
+}
+
+/* line helpers */
+function addLine(lineData = { account:'', accountName:'', desc:'', debit:0, credit:0 }){
+  const idx = Date.now().toString(36);
+  const div = document.createElement('div');
+  div.className = 'line-row';
+  div.dataset.rowId = idx;
+
+  // account select (simple text input if accounts absent)
+  let accountSelectHTML = `<select class="accountSelect">`;
+  (accounts.length ? accounts : sampleAccounts).forEach(a=>{
+    const label = a.number ? `${a.number} — ${a.name}` : a.name;
+    const val = a.id || a.number || a.name;
+    accountSelectHTML += `<option value="${val}">${label}</option>`;
+  });
+  accountSelectHTML += `</select>`;
+
+  div.innerHTML = `
+    ${accountSelectHTML}
+    <input class="line-desc" placeholder="Description / memo" style="flex:1" value="${lineData.desc || ''}" />
+    <input class="amount amount-debit" type="number" min="0" step="0.01" value="${lineData.debit || 0}" placeholder="Debit" />
+    <input class="amount amount-credit" type="number" min="0" step="0.01" value="${lineData.credit || 0}" placeholder="Credit" />
+    <button class="btn btn-ghost remove-line" title="Remove line"><i class="fa-solid fa-trash"></i></button>
+  `;
+  linesContainer.appendChild(div);
+
+  // wire events
+  div.querySelector('.amount-debit').addEventListener('input', ()=>{ if(div.querySelector('.amount-debit').value>0) div.querySelector('.amount-credit').value = 0; recalcTotals(); });
+  div.querySelector('.amount-credit').addEventListener('input', ()=>{ if(div.querySelector('.amount-credit').value>0) div.querySelector('.amount-debit').value = 0; recalcTotals(); });
+  div.querySelector('.remove-line').addEventListener('click', ()=>{ div.remove(); recalcTotals(); });
+}
+
+addLineBtn.addEventListener('click', ()=> addLine());
+
+function recalcTotals(){
+  const debits = Array.from(document.querySelectorAll('.amount-debit')).reduce((s,i)=> s + Number(i.value||0), 0);
+  const credits = Array.from(document.querySelectorAll('.amount-credit')).reduce((s,i)=> s + Number(i.value||0), 0);
+  document.getElementById('totalDebit').textContent = '$' + debits.toLocaleString();
+  document.getElementById('totalCredit').textContent = '$' + credits.toLocaleString();
+  return { debits, credits };
+}
+
+/* auto-balance — add difference into a balancing line (to first expense or suspense) */
+autoBalanceBtn.addEventListener('click', ()=> {
+  const sums = recalcTotals();
+  const diff = Number((sums.debits - sums.credits).toFixed(2));
+  if(diff === 0){ alert('Already balanced'); return; }
+  // create balancing line
+  if(diff > 0){
+    // need a credit of diff
+    addLine({ account: accounts[0]?.id || sampleAccounts[0].id, accountName: accounts[0]?.name || sampleAccounts[0].name, desc:'Auto-balance', debit:0, credit: diff });
+  } else {
+    // need a debit of -diff
+    addLine({ account: accounts[0]?.id || sampleAccounts[0].id, accountName: accounts[0]?.name || sampleAccounts[0].name, desc:'Auto-balance', debit: Math.abs(diff), credit:0 });
+  }
+  recalcTotals();
+});
+
+/* save entry */
+saveEntryBtn.addEventListener('click', ()=>{
+  const date = document.getElementById('entryDate').value;
+  const ref = document.getElementById('entryRef').value.trim();
+  const type = document.getElementById('entryType').value;
+  const status = document.getElementById('entryStatus').value;
+
+  // gather lines
+  const lines = Array.from(linesContainer.querySelectorAll('.line-row')).map(row=>({
+    account: row.querySelector('.accountSelect') ? row.querySelector('.accountSelect').value : '',
+    accountName: (row.querySelector('.accountSelect') ? row.querySelector('.accountSelect').selectedOptions[0].textContent : ''),
+    desc: row.querySelector('.line-desc').value,
+    debit: Number(row.querySelector('.amount-debit').value) || 0,
+    credit: Number(row.querySelector('.amount-credit').value) || 0
+  })).filter(l=> l.account || l.debit || l.credit);
+
+  const totalDebit = lines.reduce((s,l)=> s + (l.debit||0), 0);
+  const totalCredit = lines.reduce((s,l)=> s + (l.credit||0), 0);
+
+  if(!date){ alert('Please choose a date'); return; }
+  if(lines.length < 2){ alert('Entry must have at least two lines'); return; }
+  if(totalDebit !== totalCredit){ alert('Debits and credits must be equal. Use Auto-balance or fix amounts.'); return; }
+
+  // either add or update
+  if(editingEntryId){
+    const idx = entries.findIndex(x=> x.id === editingEntryId);
+    if(idx >= 0){
+      entries[idx] = { id: editingEntryId, date, ref, type, status, lines, notes:'' };
+    }
+  } else {
+    entries.push({ id: uid(), date, ref, type, status, lines, notes:'' });
+  }
+  saveEntries();
+  closeModal();
+});
+
+/* open edit */
+function editEntry(id){
+  const e = entries.find(x=> x.id === id);
+  if(!e) return;
+  editingEntryId = id;
+  document.getElementById('entryTitle').textContent = 'Edit Journal Entry';
+  document.getElementById('entryDate').value = e.date;
+  document.getElementById('entryRef').value = e.ref;
+  document.getElementById('entryType').value = e.type;
+  document.getElementById('entryStatus').value = e.status;
+  linesContainer.innerHTML = '';
+  e.lines.forEach(l=> addLine(l));
+  recalcTotals();
+  openModal();
+}
+
+/* delete / duplicate */
+function deleteEntry(id){
+  if(!confirm('Delete this entry?')) return;
+  entries = entries.filter(e=> e.id !== id);
+  saveEntries();
+}
+function duplicateEntry(id){
+  const e = entries.find(x=> x.id === id);
+  if(!e) return;
+  const copy = JSON.parse(JSON.stringify(e));
+  copy.id = uid();
+  copy.ref = (copy.ref || 'COPY') + '-COPY';
+  entries.push(copy);
+  saveEntries();
+}
+
+/* bulk delete placeholder */
+function bulkDelete(){
+  if(!confirm('Delete ALL journal entries?')) return;
+  entries = [];
+  saveEntries();
+}
+
+/* ============================
+   Import / Export & filters
+   ============================ */
+document.getElementById('exportJournal').addEventListener('click', ()=>{
+  const rows = [['id','date','ref','type','status','lines_json']];
+  entries.forEach(e=> rows.push([e.id,e.date,e.ref,e.type,e.status, JSON.stringify(e.lines)]));
+  const csv = rows.map(r=> r.map(c=> `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'journal_entries.csv'; a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('importJournal').addEventListener('click', ()=>{
+  const input = document.createElement('input'); input.type='file'; input.accept='application/json,text/json';
+  input.addEventListener('change', e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if(Array.isArray(data)){
+          // map to required shape
+          data.forEach(d=>{
+            entries.push({ id: d.id || uid(), date: d.date||d.entryDate||new Date().toISOString().slice(0,10), ref: d.ref||'', type:d.type||'journal', status:d.status||'Pending', lines: d.lines||[] });
+          });
+          saveEntries();
+          alert('Imported entries.');
+        } else alert('JSON must be an array of entries');
+      } catch(err){ alert('Invalid JSON: '+err.message); }
+    };
+    r.readAsText(f);
+  });
+  input.click();
+});
+
+/* Filters */
+document.getElementById('globalSearch').addEventListener('input', ()=> {
+  const q = document.getElementById('globalSearch').value;
+  const from = document.getElementById('fromDate').value || null;
+  const to = document.getElementById('toDate').value || null;
+  const type = document.getElementById('typeFilter').value;
+  renderEntries(q, from, to, type);
+});
+document.getElementById('fromDate').addEventListener('change', ()=> {
+  document.getElementById('globalSearch').dispatchEvent(new Event('input'));
+});
+document.getElementById('toDate').addEventListener('change', ()=> {
+  document.getElementById('globalSearch').dispatchEvent(new Event('input'));
+});
+document.getElementById('typeFilter').addEventListener('change', ()=> {
+  document.getElementById('globalSearch').dispatchEvent(new Event('input'));
+});
+
+function clearFilters(){
+  document.getElementById('globalSearch').value = '';
+  document.getElementById('fromDate').value = '';
+  document.getElementById('toDate').value = '';
+  document.getElementById('typeFilter').value = 'all';
+  renderEntries();
+}
+
+/* ============================
+   Theme toggle & init
+   ============================ */
+const themeToggle = document.getElementById('themeToggle');
+(function initTheme(){
+  const saved = localStorage.getItem('bf_theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+  themeToggle.innerHTML = saved === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+})();
+themeToggle.addEventListener('click', ()=>{
+  const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('bf_theme', next);
+  themeToggle.innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+});
+
+/* ============================
+   Init app
+   ============================ */
+function init(){
+  loadData();
+  renderEntries();
+  updateStats();
+  updateChart();
+  // small UX: keyboard Enter on search triggers re-render
+  document.getElementById('globalSearch').addEventListener('keypress', (e)=> { if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('globalSearch').dispatchEvent(new Event('input')); }});
+}
+init();
+
+/* expose for debugging */
+window.bf_journal = { entries, saveEntries, renderEntries, addLine, accounts };
+
+</script>
+</body>
+</html>

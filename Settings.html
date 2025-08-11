@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Settings</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- XLSX for backups -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    :root{
+      --blue-900: #0b3d91;
+      --blue-700: #1464c9;
+      --blue-500: #2a9df4;
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --muted: #6b7280;
+      --accent: #17a2b8;
+      --radius: 12px;
+    }
+    [data-theme="dark"]{
+      --bg: #0f1724;
+      --panel:#0f1724;
+      --muted:#9ca3af;
+      --blue-900:#071733;
+      --blue-700:#0a3a6b;
+      --blue-500:#1f6fb3;
+    }
+
+    *{box-sizing:border-box;font-family:Inter, "Segoe UI", Roboto, system-ui, -apple-system, Arial}
+    body{
+      margin:0;
+      background: linear-gradient(180deg,var(--bg), #e9f2ff 300px);
+      color: #072036;
+      transition: background .3s, color .3s;
+      --sidebar-w:260px;
+      min-height:100vh;
+    }
+    [data-theme="dark"] body{ color:#e6eef8 }
+
+    /* layout */
+    .app{ display:flex; min-height:100vh; }
+    .sidebar{
+      width:var(--sidebar-w);
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color:#fff;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      position:fixed; left:0; top:0; bottom:0;
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+    main.main{ margin-left:var(--sidebar-w); padding:24px; width:calc(100% - var(--sidebar-w)) }
+
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px }
+    .controls{ display:flex; gap:10px; align-items:center }
+
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; cursor:pointer; border:none; font-weight:600 }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; box-shadow:0 8px 18px rgba(42,157,244,0.12) }
+    .btn-ghost{ background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted) }
+    .icon-btn{ background:var(--panel); padding:8px; border-radius:10px; border:1px solid rgba(15,23,42,0.05) }
+
+    /* page layout */
+    .grid{ display:grid; grid-template-columns: 1fr 420px; gap:18px; align-items:start }
+    @media (max-width:1000px){ .grid{ grid-template-columns: 1fr } }
+
+    .card{ background:var(--panel); border-radius:12px; padding:16px; box-shadow:0 6px 20px rgba(16,24,40,0.04); transition: transform .28s }
+    .card:hover{ transform:translateY(-6px) }
+
+    h3.section-title{ margin:0 0 10px 0 }
+
+    /* forms */
+    .form-row{ display:flex; gap:12px; flex-wrap:wrap }
+    .form-group{ margin-bottom:12px }
+    label{ display:block; font-weight:700; margin-bottom:6px }
+    input[type="text"], input[type="email"], input[type="url"], select, textarea{
+      width:100%; padding:10px; border-radius:10px; border:1px solid rgba(15,23,42,0.06); background:var(--panel)
+    }
+    textarea{ min-height:90px; resize:vertical }
+
+    /* user list */
+    .user-list{ display:flex; flex-direction:column; gap:10px; max-height:480px; overflow:auto; padding-right:6px }
+    .user-row{ display:flex; gap:12px; align-items:center; background:linear-gradient(90deg, rgba(0,0,0,0.02), rgba(255,255,255,0.02)); padding:10px; border-radius:10px }
+    .avatar{ width:44px; height:44px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700 }
+    .role-badge{ padding:6px 10px; border-radius:999px; font-weight:700 }
+
+    /* switches */
+    .switch{ position:relative; width:46px; height:26px; background:#e6eaf2; border-radius:20px; cursor:pointer }
+    .switch .dot{ position:absolute; top:3px; left:3px; width:20px; height:20px; background:#fff; border-radius:50%; transition:left .18s }
+    .switch.on{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)) }
+    .switch.on .dot{ left:23px }
+
+    /* small helpers */
+    .muted{ color:var(--muted) }
+    .small{ font-size:.9rem }
+    .hr{ height:1px; background:rgba(0,0,0,0.06); margin:12px 0; border-radius:4px }
+
+    /* modal */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(2,6,23,0.45); display:flex; align-items:center; justify-content:center; z-index:60 }
+    .modal{ width:720px; max-width:95%; background:var(--panel); border-radius:12px; padding:18px; box-shadow:0 20px 60px rgba(2,6,23,0.6) }
+    .modal h3{ margin:0 0 12px 0 }
+    .modal .form-row .col{ flex:1 }
+
+    /* animations */
+    @keyframes popIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+    .card{ animation: popIn .45s ease both }
+  </style>
+</head>
+<body data-theme="light">
+<div class="app">
+
+  <!-- sidebar (shared) -->
+  <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate </span></div>
+    <nav class="nav-links" aria-label="Main navigation">
+        <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+        <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+        <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+        <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+        <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+        <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+        <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+        <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+        <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+        <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+        <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+        <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+        <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+        <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+        <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+        <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+        <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+        <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-user"></i></div>
+        <div>
+          <div style="font-weight:700">Factory #12</div>
+          <div style="font-size:.85rem;opacity:.9">Plan: Enterprise</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- main -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h2 style="margin:0">Settings</h2>
+        <div class="muted small">Configure company details, users, billing, integratons and system preferences</div>
+      </div>
+
+      <div class="controls">
+        <button class="btn icon-btn" onclick="toggleTheme()" id="themeToggle"><i class="fa-regular fa-moon"></i></button>
+        <button class="btn btn-primary" id="saveAllBtn"><i class="fa-solid fa-check"></i> Save</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- left column: settings forms -->
+      <section>
+        <!-- Company profile -->
+        <div class="card">
+          <h3 class="section-title">Company Profile</h3>
+          <p class="muted small">Basic info displayed on invoices and reports.</p>
+
+          <div class="form-row" style="margin-top:10px">
+            <div class="form-group col">
+              <label>Company name</label>
+              <input id="company_name" type="text" placeholder="BlueFactory Ltd." />
+            </div>
+            <div class="form-group col">
+              <label>Company domain</label>
+              <input id="company_domain" type="text" placeholder="bluefactory.example" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Email</label>
+              <input id="company_email" type="email" placeholder="billing@bluefactory.com" />
+            </div>
+            <div class="form-group col">
+              <label>Phone</label>
+              <input id="company_phone" type="text" placeholder="+20 100 000 0000" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Address</label>
+            <input id="company_address" type="text" placeholder="City, Street, Building" />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Logo URL</label>
+              <input id="company_logo" type="url" placeholder="https://..." />
+            </div>
+            <div class="form-group col">
+              <label>Default currency</label>
+              <select id="company_currency">
+                <option value="EGP">EGP</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Billing & Plan -->
+        <div class="card" style="margin-top:16px">
+          <h3 class="section-title">Billing & Plan</h3>
+          <p class="muted small">Plan info and billing contact.</p>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Plan</label>
+              <select id="plan_select">
+                <option value="free">Free</option>
+                <option value="pro">Pro</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
+            </div>
+            <div class="form-group col">
+              <label>Billing email</label>
+              <input id="billing_email" type="email" />
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+            <button class="btn btn-ghost" onclick="downloadBackup()">Download Backup</button>
+            <button class="btn btn-ghost" onclick="restoreBackup()">Restore Backup</button>
+            <button class="btn btn-ghost" onclick="exportSettingsJson()">Export JSON</button>
+          </div>
+        </div>
+
+        <!-- Tax & Invoice settings -->
+        <div class="card" style="margin-top:16px">
+          <h3 class="section-title">Invoices & Taxes</h3>
+          <p class="muted small">Configure defaults for invoices, taxes, discounts and numbering.</p>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Invoice prefix</label>
+              <input id="invoice_prefix" type="text" placeholder="INV-" />
+            </div>
+            <div class="form-group col">
+              <label>Next invoice no.</label>
+              <input id="invoice_next" type="text" placeholder="1001" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Default tax rate (%)</label>
+              <input id="tax_default" type="text" placeholder="14" />
+            </div>
+            <div class="form-group col">
+              <label>Allow multiple tax lines</label>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div id="tax_multi_switch" class="switch" onclick="toggleSwitch(this)"><div class="dot"></div></div>
+                <div class="muted small">Toggle to allow line-level taxes</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Default discount type</label>
+            <select id="discount_type">
+              <option value="percent">Percent (%)</option>
+              <option value="amount">Fixed amount</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Integrations -->
+        <div class="card" style="margin-top:16px">
+          <h3 class="section-title">Integrations</h3>
+          <p class="muted small">Connect external services (example: Firebase, Shipping API).</p>
+
+          <div class="form-group">
+            <label>Firebase Enabled</label>
+            <div style="display:flex;align-items:center;gap:12px">
+              <div id="firebase_switch" class="switch" onclick="toggleSwitch(this)"><div class="dot"></div></div>
+              <div class="muted small">When enabled, data will sync to Firestore (requires configuration below).</div>
+            </div>
+          </div>
+
+          <div id="firebase_settings" style="display:none;margin-top:10px">
+            <div class="form-row">
+              <div class="form-group col">
+                <label>API Key</label>
+                <input id="fb_apiKey" type="text" placeholder="AIza..." />
+              </div>
+              <div class="form-group col">
+                <label>Project ID</label>
+                <input id="fb_projectId" type="text" placeholder="your-project" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Firestore collection prefix</label>
+              <input id="fb_prefix" type="text" placeholder="bf_" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Users & Roles -->
+        <div class="card" style="margin-top:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <h3 class="section-title">Users & Roles</h3>
+              <div class="muted small">Add team members and assign roles (admin/accountant/viewer).</div>
+            </div>
+            <div>
+              <button class="btn btn-ghost" onclick="openUserModal()">+ Add user</button>
+            </div>
+          </div>
+
+          <div class="user-list" id="userList">
+            <!-- users inserted by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- right column: quick details & logs -->
+      <aside>
+        <div class="card">
+          <h3 class="section-title">Audit & Activity</h3>
+          <p class="muted small">Recent system actions (local audit log).</p>
+          <div id="activityLog" style="max-height:300px;overflow:auto;margin-top:8px"></div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn btn-ghost" onclick="clearActivity()">Clear log</button>
+            <button class="btn btn-ghost" onclick="downloadActivity()">Export log</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h3 class="section-title">Appearance</h3>
+          <p class="muted small">Theme & UI preferences</p>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
+            <div>Dark theme</div>
+            <div id="appearance_switch" class="switch" onclick="toggleSwitch(this)"><div class="dot"></div></div>
+          </div>
+
+          <div style="margin-top:12px">
+            <label class="small">Primary accent</label>
+            <input id="accent_color" type="color" value="#1464c9" style="width:64px;height:36px;border:none" />
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h3 class="section-title">System</h3>
+          <p class="muted small">Advanced options</p>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+            <button class="btn btn-ghost" onclick="resetToDefaults()">Reset to defaults</button>
+            <button class="btn btn-ghost" onclick="clearAllData()">Clear all local data</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div style="height:18px"></div>
+    <div class="muted page-footer">© 2025 FinMate — Accounting for Manufacturers</div>
+  </main>
+</div>
+
+<!-- User modal -->
+<div id="userModal" class="modal-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3 id="userModalTitle">Add User</h3>
+
+    <div class="form-group">
+      <label>Name</label>
+      <input id="u_name" type="text" />
+    </div>
+    <div class="form-row">
+      <div class="form-group col">
+        <label>Email</label>
+        <input id="u_email" type="email" />
+      </div>
+      <div class="form-group col">
+        <label>Role</label>
+        <select id="u_role">
+          <option value="admin">Admin</option>
+          <option value="accountant">Accountant</option>
+          <option value="viewer">Viewer</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-ghost" onclick="closeUserModal()">Cancel</button>
+      <button class="btn btn-primary" id="saveUserBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Theme initialisation
+  (function(){
+    const savedTheme = localStorage.getItem('bf_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme === 'dark' ? 'dark' : 'light');
+    document.getElementById('themeToggle').innerHTML = savedTheme === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+    // appearance switch reflect
+    const appTheme = savedTheme === 'dark';
+    if(appTheme) document.getElementById('appearance_switch').classList.add('on');
+  })();
+
+  function toggleTheme(){
+    const dt = document.documentElement;
+    const current = dt.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    dt.setAttribute('data-theme', next);
+    localStorage.setItem('bf_theme', next);
+    document.getElementById('themeToggle').innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+    // mirror appearance switch
+    if(next === 'dark') document.getElementById('appearance_switch').classList.add('on'); else document.getElementById('appearance_switch').classList.remove('on');
+  }
+
+  // Helper uid
+  function uid(){ return 'id_' + Math.random().toString(36).slice(2,9) }
+
+  // Storage keys
+  const SETTINGS_KEY = 'bf_settings_v1';
+  const USERS_KEY = 'bf_users_v1';
+  const ACTIVITY_KEY = 'bf_activity_v1';
+
+  // Load or default settings
+  const defaultSettings = {
+    company_name: 'BlueFactory Ltd.',
+    company_domain: 'bluefactory.local',
+    company_email: 'billing@bluefactory.com',
+    company_phone: '+20 100 000 0000',
+    company_address: 'Cairo, Egypt',
+    company_logo: '',
+    company_currency: 'EGP',
+    plan: 'enterprise',
+    billing_email: 'billing@bluefactory.com',
+    invoice_prefix: 'INV-',
+    invoice_next: '1001',
+    tax_default: '14',
+    tax_multi: false,
+    discount_type: 'percent',
+    firebase_enabled: false,
+    fb_apiKey: '',
+    fb_projectId: '',
+    fb_prefix: 'bf_',
+    accent_color: '#1464c9'
+  };
+
+  let settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null') || defaultSettings;
+  let users = JSON.parse(localStorage.getItem(USERS_KEY) || 'null') || [
+    { id: uid(), name: 'Admin User', email: 'admin@bluefactory.com', role:'admin', createdAt: Date.now() }
+  ];
+  let activityLog = JSON.parse(localStorage.getItem(ACTIVITY_KEY) || 'null') || [];
+
+  // DOM helpers
+  function $(id){ return document.getElementById(id) }
+
+  // Populate UI from settings
+  function loadSettingsToUI(){
+    $('company_name').value = settings.company_name || '';
+    $('company_domain').value = settings.company_domain || '';
+    $('company_email').value = settings.company_email || '';
+    $('company_phone').value = settings.company_phone || '';
+    $('company_address').value = settings.company_address || '';
+    $('company_logo').value = settings.company_logo || '';
+    $('company_currency').value = settings.company_currency || 'EGP';
+    $('plan_select').value = settings.plan || 'free';
+    $('billing_email').value = settings.billing_email || '';
+    $('invoice_prefix').value = settings.invoice_prefix || 'INV-';
+    $('invoice_next').value = settings.invoice_next || '1001';
+    $('tax_default').value = settings.tax_default || '0';
+    if(settings.tax_multi) document.getElementById('tax_multi_switch').classList.add('on'); else document.getElementById('tax_multi_switch').classList.remove('on');
+    $('discount_type').value = settings.discount_type || 'percent';
+    if(settings.firebase_enabled) document.getElementById('firebase_switch').classList.add('on'); else document.getElementById('firebase_switch').classList.remove('on');
+    $('fb_apiKey').value = settings.fb_apiKey || '';
+    $('fb_projectId').value = settings.fb_projectId || '';
+    $('fb_prefix').value = settings.fb_prefix || '';
+    $('invoice_next').value = settings.invoice_next || '';
+    $('accent_color').value = settings.accent_color || '#1464c9';
+
+    // show firebase section if enabled
+    document.getElementById('firebase_settings').style.display = settings.firebase_enabled ? 'block' : 'none';
+  }
+
+  // save settings from UI
+  function saveSettingsFromUI(){
+    settings.company_name = $('company_name').value.trim();
+    settings.company_domain = $('company_domain').value.trim();
+    settings.company_email = $('company_email').value.trim();
+    settings.company_phone = $('company_phone').value.trim();
+    settings.company_address = $('company_address').value.trim();
+    settings.company_logo = $('company_logo').value.trim();
+    settings.company_currency = $('company_currency').value;
+    settings.plan = $('plan_select').value;
+    settings.billing_email = $('billing_email').value.trim();
+    settings.invoice_prefix = $('invoice_prefix').value.trim();
+    settings.invoice_next = $('invoice_next').value.trim();
+    settings.tax_default = $('tax_default').value.trim();
+    settings.discount_type = $('discount_type').value;
+    settings.fb_apiKey = $('fb_apiKey').value.trim();
+    settings.fb_projectId = $('fb_projectId').value.trim();
+    settings.fb_prefix = $('fb_prefix').value.trim();
+    settings.accent_color = $('accent_color').value;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    logActivity('Settings saved');
+    alert('Settings saved locally (you can wire to Firestore later).');
+  }
+
+  $('saveAllBtn').addEventListener('click', saveSettingsFromUI);
+
+  // switch toggles
+  function toggleSwitch(el){
+    el.classList.toggle('on');
+    // handle mapped switches
+    if(el.id === 'tax_multi_switch'){ settings.tax_multi = el.classList.contains('on'); }
+    if(el.id === 'firebase_switch'){
+      settings.firebase_enabled = el.classList.contains('on');
+      document.getElementById('firebase_settings').style.display = settings.firebase_enabled ? 'block' : 'none';
+      logActivity('Firebase ' + (settings.firebase_enabled ? 'enabled' : 'disabled'));
+    }
+    if(el.id === 'appearance_switch'){
+      const on = el.classList.contains('on');
+      document.documentElement.setAttribute('data-theme', on ? 'dark' : 'light');
+      localStorage.setItem('bf_theme', on ? 'dark' : 'light');
+      document.getElementById('themeToggle').innerHTML = on ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+    }
+  }
+
+  // Users management
+  function renderUsers(){
+    const el = $('userList');
+    el.innerHTML = '';
+    users.forEach(u=>{
+      const div = document.createElement('div');
+      div.className = 'user-row';
+      div.innerHTML = `
+        <div class="avatar" style="background:linear-gradient(135deg,#2a9df4,#1464c9)">${(u.name||'U').slice(0,1).toUpperCase()}</div>
+        <div style="flex:1">
+          <div style="font-weight:700">${escapeHtml(u.name)}</div>
+          <div class="muted small">${escapeHtml(u.email)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <div class="role-badge" style="background:${u.role==='admin'?'#0ea5a4':u.role==='accountant'?'#f59e0b':'#6b7280'};color:#fff">${u.role}</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost" onclick="editUser('${u.id}')"><i class="fa-solid fa-pen"></i></button>
+            <button class="btn btn-ghost" onclick="deleteUser('${u.id}')"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+      `;
+      el.appendChild(div);
+    });
+  }
+
+  function openUserModal(){
+    editingUserId = null;
+    $('u_name').value = ''; $('u_email').value = ''; $('u_role').value = 'viewer';
+    document.getElementById('userModal').style.display = 'flex';
+  }
+  function closeUserModal(){ document.getElementById('userModal').style.display = 'none'; editingUserId = null; }
+
+  let editingUserId = null;
+  function editUser(id){
+    const u = users.find(x=>x.id===id); if(!u) return;
+    editingUserId = id;
+    $('u_name').value = u.name; $('u_email').value = u.email; $('u_role').value = u.role;
+    document.getElementById('userModal').style.display = 'flex';
+  }
+
+  $('saveUserBtn').addEventListener('click', ()=>{
+    const name = $('u_name').value.trim(); const email = $('u_email').value.trim(); const role = $('u_role').value;
+    if(!name || !email){ alert('Name and email required'); return; }
+    if(editingUserId){
+      users = users.map(u => u.id===editingUserId ? {...u, name, email, role} : u);
+      logActivity(`User updated: ${name}`);
+    } else {
+      users.push({ id: uid(), name, email, role, createdAt: Date.now() });
+      logActivity(`User added: ${name}`);
+    }
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    renderUsers(); closeUserModal();
+  });
+
+  function deleteUser(id){
+    if(!confirm('Delete this user?')) return;
+    users = users.filter(u=>u.id!==id);
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    renderUsers();
+    logActivity('User deleted');
+  }
+
+  // Activity log
+  function logActivity(msg){
+    const entry = { id: uid(), t: Date.now(), msg };
+    activityLog.unshift(entry);
+    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activityLog));
+    renderActivity();
+  }
+  function renderActivity(){
+    const el = $('activityLog');
+    el.innerHTML = '';
+    if(!activityLog.length) el.innerHTML = '<div class="muted small">No recent activity</div>';
+    activityLog.forEach(a=>{
+      const d = new Date(a.t);
+      const div = document.createElement('div');
+      div.style.padding = '8px'; div.style.borderBottom = '1px solid rgba(0,0,0,0.04)';
+      div.innerHTML = `<div style="font-weight:700">${escapeHtml(a.msg)}</div><div class="muted small">${d.toLocaleString()}</div>`;
+      el.appendChild(div);
+    });
+  }
+  function clearActivity(){ if(confirm('Clear activity log?')){ activityLog = []; localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activityLog)); renderActivity(); } }
+  function downloadActivity(){
+    if(!activityLog.length) return alert('No log entries');
+    const data = activityLog.map(a => ({ timestamp: new Date(a.t).toISOString(), message: a.msg }));
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'activity.json'; a.click(); URL.revokeObjectURL(url);
+  }
+
+  // backups
+  function downloadBackup(){
+    const payload = {
+      settings, users, activity: activityLog, exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='bluefactory_backup.json'; a.click(); URL.revokeObjectURL(url);
+    logActivity('Backup downloaded');
+  }
+
+  function restoreBackup(){
+    const input = document.createElement('input'); input.type='file'; input.accept='application/json';
+    input.onchange = e => {
+      const file = e.target.files[0]; if(!file) return;
+      const reader = new FileReader();
+      reader.onload = evt => {
+        try {
+          const obj = JSON.parse(evt.target.result);
+          if(obj.settings) settings = obj.settings;
+          if(obj.users) users = obj.users;
+          if(obj.activity) activityLog = obj.activity;
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+          localStorage.setItem(USERS_KEY, JSON.stringify(users));
+          localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activityLog));
+          loadSettingsToUI(); renderUsers(); renderActivity();
+          alert('Backup restored (local).');
+          logActivity('Backup restored');
+        } catch(err){
+          alert('Invalid file.');
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+
+  // export settings JSON
+  function exportSettingsJson(){
+    const blob = new Blob([JSON.stringify({settings, users, activity:activityLog}, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='bluefactory_settings.json'; a.click(); URL.revokeObjectURL(url);
+  }
+
+  // reset & clear
+  function resetToDefaults(){ if(!confirm('Reset settings to defaults?')) return; settings = defaultSettings; localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); loadSettingsToUI(); logActivity('Settings reset to defaults'); }
+  function clearAllData(){ if(!confirm('Clear all local data (settings, users, logs)?')) return; localStorage.removeItem(SETTINGS_KEY); localStorage.removeItem(USERS_KEY); localStorage.removeItem(ACTIVITY_KEY); settings = JSON.parse(JSON.stringify(defaultSettings)); users = []; activityLog = []; loadSettingsToUI(); renderUsers(); renderActivity(); logActivity('All local data cleared'); }
+
+  // small helpers
+  function escapeHtml(s=''){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') }
+
+  // init
+  (function init(){
+    loadSettingsToUI(); renderUsers(); renderActivity();
+    // wire firebase switch visibility
+    document.getElementById('firebase_switch').addEventListener('click', ()=> {
+      const on = document.getElementById('firebase_switch').classList.contains('on');
+      settings.firebase_enabled = on;
+      document.getElementById('firebase_settings').style.display = on ? 'block' : 'none';
+    });
+    // appearance switch reflect initial theme
+    if(document.documentElement.getAttribute('data-theme') === 'dark') document.getElementById('appearance_switch').classList.add('on');
+  })();
+
+  // close modals on esc
+  document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape'){ document.getElementById('userModal').style.display='none'; } });
+
+</script>
+</body>
+</html>

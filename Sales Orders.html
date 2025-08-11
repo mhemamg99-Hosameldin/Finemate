@@ -1,0 +1,640 @@
+<!-- sales-orders.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Sales Orders</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Chart.js (optional) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Sheet export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    :root{
+      --blue-900:#0b3d91;
+      --blue-700:#1464c9;
+      --blue-500:#2a9df4;
+      --bg:#f4f7fb;
+      --panel:#ffffff;
+      --muted:#6b7280;
+      --glass: rgba(255,255,255,0.6);
+      --accent: #17a2b8;
+    }
+    [data-theme="dark"]{
+      --bg:#0f1724; --panel:#111827; --muted:#9ca3af; --blue-900:#071733; --blue-700:#0a3a6b; --blue-500:#1f6fb3;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg), #e9f2ff 320px); color:#0b1220; transition:all .3s;
+      min-height:100vh; --sidebar-w:260px;
+    }
+    [data-theme="dark"] body{ color:#e6eef8; }
+
+    .app{ display:flex; min-height:100vh; }
+
+    .sidebar{
+      width:var(--sidebar-w);
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color: #fff;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      position:fixed;
+      left:0; top:0; bottom:0;
+      box-shadow: 0 6px 24px rgba(10,25,60,0.12);
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem; color: #fff; transform:translateY(-1px) }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+    /* Main */
+    .main{ margin-left:var(--sidebar-w); padding:24px; width:calc(100% - var(--sidebar-w)); transition: width .3s, margin-left .3s; }
+
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+    .search{ flex:1; max-width:540px; display:flex; gap:8px; align-items:center; }
+    .search input{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,0.06); background:var(--panel); box-shadow:0 2px 8px rgba(11,18,32,0.04); }
+
+    .controls{ display:flex; gap:10px; align-items:center; }
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; cursor:pointer; border:none; font-weight:600; }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; box-shadow:0 8px 18px rgba(42,157,244,0.14); }
+    .btn-ghost{ background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted); padding:8px 10px; border-radius:8px }
+    .icon-btn{ background:var(--panel); padding:8px; border-radius:10px; border:1px solid rgba(15,23,42,0.05) }
+
+    /* Content grid */
+    .grid{ display:grid; grid-template-columns: repeat(12, 1fr); gap:18px; }
+    .card{ background:var(--panel); border-radius:12px; padding:16px; box-shadow:0 6px 20px rgba(16,24,40,0.04); transition: transform .28s, box-shadow .28s; overflow:hidden; }
+    .card:hover{ transform:translateY(-6px); box-shadow:0 16px 36px rgba(16,24,40,0.08); }
+
+    .orders-panel{ grid-column: span 12; }
+    .toolbar{ display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+
+    table{ width:100%; border-collapse:collapse; font-size:.95rem; }
+    thead th{ text-align:left; color:var(--muted); font-weight:700; padding:10px 6px; font-size:.86rem; border-bottom:1px solid rgba(0,0,0,0.06) }
+    tbody tr{ transition: background .18s, transform .18s; border-bottom:1px solid rgba(0,0,0,0.04) }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform: translateX(4px); }
+    td{ padding:12px 6px; vertical-align:middle; }
+
+    .status-pill{ padding:6px 10px; border-radius:999px; color:white; font-weight:700; font-size:.82rem; display:inline-block; }
+    .st-pending{ background:#f59e0b } .st-shipped{ background:#0ea5a3 } .st-complete{ background:#10b981 } .st-cancel{ background:#ef4444 }
+
+    /* modal */
+    .modal-backdrop{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:60; }
+    .modal{ width:920px; max-width:95%; background:var(--panel); padding:18px; border-radius:12px; box-shadow:0 24px 64px rgba(2,6,23,0.6); max-height:90vh; overflow:auto }
+    .modal h3{ margin:0 0 8px 0 }
+    .line-items{ border-radius:8px; border:1px solid rgba(0,0,0,0.06); padding:8px; margin-top:8px; }
+
+    .input, input, select { padding:8px 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.08); width:100%; box-sizing:border-box; }
+    .small{ font-size:.9rem; color:var(--muted) }
+
+    .actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+
+    /* responsive */
+    @media (max-width:1100px){
+      :root{ --sidebar-w:72px }
+      .sidebar{ width:var(--sidebar-w); padding:12px }
+      .brand span{ display:none }
+      .main{ margin-left:var(--sidebar-w); width:calc(100% - var(--sidebar-w)); padding:14px; }
+    }
+
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="app" id="app">
+
+
+    <!-- SIDEBAR -->
+  <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+      <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+      <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+      <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+    
+
+    <div class="sidebar-footer">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-circle-info"></i></div>
+        <div>
+          <div style="font-weight:700">Factory #12</div>
+          <div style="font-size:.85rem;opacity:.9">Plan: Enterprise</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2 style="margin:0">Sales Orders</h2>
+        <div style="color:var(--muted)">Manage your sales orders — create, track and export</div>
+      </div>
+
+      <div class="controls">
+        <div class="search"><input id="globalSearch" placeholder="Search order ref, customer, product..." /></div>
+        <button class="btn icon-btn" title="Notifications"><i class="fa-regular fa-bell"></i></button>
+        <button class="btn icon-btn" id="themeToggle" title="Toggle theme"><i class="fa-regular fa-moon"></i></button>
+        <button class="btn btn-primary" id="openNewOrder"><i class="fa-solid fa-plus"></i> New Order</button>
+      </div>
+    </div>
+
+    <!-- Orders card -->
+    <section class="grid">
+      <div class="card orders-panel">
+        <div class="toolbar">
+          <select id="statusFilter" class="btn-ghost">
+            <option value="all">All statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Shipped">Shipped</option>
+            <option value="Completed">Completed</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+
+          <select id="sortBy" class="btn-ghost">
+            <option value="date_desc">Date (newest)</option>
+            <option value="date_asc">Date (oldest)</option>
+            <option value="amount_desc">Amount (high→low)</option>
+            <option value="amount_asc">Amount (low→high)</option>
+          </select>
+
+          <button class="btn btn-ghost" id="exportCSV"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+          <button class="btn btn-ghost" id="exportExcel"><i class="fa-solid fa-file-excel"></i> Export XLSX</button>
+          <button class="btn btn-ghost" id="exportPDF"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>
+
+          <div style="margin-left:auto" class="small">Orders saved: <strong id="ordersCount">0</strong></div>
+        </div>
+
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Ref</th>
+                <th>Customer</th>
+                <th>Items</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th style="text-align:right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTable">
+              <!-- filled by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <div class="page-footer" style="margin-top:18px">© 2025 BlueFactory — Accounting for Manufacturers</div>
+  </main>
+
+</div>
+
+<!-- Modal template (hidden) -->
+<div id="orderModalBackdrop" style="display:none" class="modal-backdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 id="modalTitle">New Sales Order</h3>
+      <button class="btn-ghost" id="closeModal"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 200px; gap:12px">
+      <div>
+        <label class="small">Customer</label>
+        <input id="custName" class="input" placeholder="Customer name / company" />
+      </div>
+      <div>
+        <label class="small">Order Date</label>
+        <input id="orderDate" type="date" class="input" />
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <label class="small">Notes</label>
+      <input id="orderNotes" class="input" placeholder="Optional notes" />
+    </div>
+
+    <div style="margin-top:10px" class="line-items">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong>Line Items</strong>
+        <div>
+          <button class="btn-ghost" id="addLineBtn"><i class="fa-solid fa-plus"></i> Add line</button>
+        </div>
+      </div>
+
+      <div id="linesContainer" style="margin-top:8px"></div>
+
+      <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:12px">
+        <div style="text-align:right">
+          <div class="small">Subtotal</div>
+          <div id="subtotal">$0.00</div>
+        </div>
+        <div style="text-align:right">
+          <div class="small">Tax</div>
+          <div id="taxTotal">$0.00</div>
+        </div>
+        <div style="text-align:right">
+          <div class="small">Discount</div>
+          <div id="discountTotal">$0.00</div>
+        </div>
+        <div style="text-align:right;min-width:120px">
+          <div class="small">Total</div>
+          <div id="orderTotal" style="font-weight:700">$0.00</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <select id="saveStatus" class="btn-ghost">
+        <option value="Pending">Pending</option>
+        <option value="Shipped">Shipped</option>
+        <option value="Completed">Completed</option>
+        <option value="Cancelled">Cancelled</option>
+      </select>
+      <button class="btn" id="saveDraft" style="background:#f3f4f6">Save Draft</button>
+      <button class="btn btn-primary" id="saveOrderBtn"><i class="fa-solid fa-check"></i> Save Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+<script>
+/* ============================
+   Firebase setup - REPLACE with your config
+   ============================ */
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "SENDER_ID",
+  appId: "APP_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* ============================
+   Simple Sales Orders Manager
+   ============================ */
+const ordersCol = db.collection('sales_orders'); // collection name
+
+let orders = [];            // client cache
+let editingOrderId = null;  // track edit
+
+// UI elements
+const ordersTable = document.getElementById('ordersTable');
+const ordersCount = document.getElementById('ordersCount');
+const openNewOrderBtn = document.getElementById('openNewOrder');
+const modalBack = document.getElementById('orderModalBackdrop');
+const closeModalBtn = document.getElementById('closeModal');
+const addLineBtn = document.getElementById('addLineBtn');
+const linesContainer = document.getElementById('linesContainer');
+const saveOrderBtn = document.getElementById('saveOrderBtn');
+const saveDraftBtn = document.getElementById('saveDraft');
+const globalSearch = document.getElementById('globalSearch');
+const statusFilter = document.getElementById('statusFilter');
+const sortBy = document.getElementById('sortBy');
+const exportCSVBtn = document.getElementById('exportCSV');
+const exportExcelBtn = document.getElementById('exportExcel');
+const exportPDFBtn = document.getElementById('exportPDF');
+const themeToggle = document.getElementById('themeToggle');
+
+const modalTitle = document.getElementById('modalTitle');
+const custName = document.getElementById('custName');
+const orderDate = document.getElementById('orderDate');
+const orderNotes = document.getElementById('orderNotes');
+const subtotalEl = document.getElementById('subtotal');
+const taxTotalEl = document.getElementById('taxTotal');
+const discountTotalEl = document.getElementById('discountTotal');
+const orderTotalEl = document.getElementById('orderTotal');
+const saveStatusEl = document.getElementById('saveStatus');
+
+// helpers
+function formatMoney(n){ return '$' + Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function uid(){ return 'ORD-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7); }
+
+/* ---------- Modal logic ---------- */
+function openModal(newOrder = true, order = null){
+  modalBack.style.display = 'flex';
+  if(newOrder){
+    modalTitle.textContent = 'New Sales Order';
+    editingOrderId = null;
+    custName.value=''; orderDate.valueAsDate = new Date(); orderNotes.value=''; saveStatusEl.value = 'Pending';
+    linesContainer.innerHTML = '';
+    addLine(); addLine();
+  } else {
+    modalTitle.textContent = 'Edit Sales Order';
+    editingOrderId = order.id;
+    custName.value = order.customer;
+    orderDate.value = order.date || '';
+    orderNotes.value = order.notes || '';
+    saveStatusEl.value = order.status || 'Pending';
+    linesContainer.innerHTML = '';
+    (order.items || []).forEach(it => addLine(it));
+  }
+  recalcTotals();
+}
+function closeModal(){
+  modalBack.style.display = 'none';
+}
+
+/* ---------- dynamic line items ---------- */
+function addLine(data = null){
+  const id = Math.random().toString(36).slice(2,9);
+  const row = document.createElement('div');
+  row.className = 'line-row';
+  row.style = 'display:grid;grid-template-columns: 1fr 80px 100px 80px 40px;gap:8px;margin-top:8px;align-items:center';
+  row.dataset.id = id;
+  row.innerHTML = `
+    <input class="input li-product" placeholder="Product / SKU" value="${data?data.product:''}" />
+    <input class="input li-qty" type="number" min="1" value="${data?data.qty||1:1}" />
+    <input class="input li-price" type="number" min="0" step="0.01" value="${data?data.price||0:0}" />
+    <input class="input li-tax" type="number" min="0" step="0.01" value="${data?data.tax||0:0}" />
+    <button class="btn-ghost removeLine" title="Remove"><i class="fa-solid fa-trash"></i></button>
+  `;
+  linesContainer.appendChild(row);
+
+  row.querySelectorAll('.li-qty, .li-price, .li-tax').forEach(el=>{
+    el.addEventListener('input', recalcTotals);
+  });
+  row.querySelector('.removeLine').addEventListener('click', ()=>{ row.remove(); recalcTotals(); });
+  recalcTotals();
+}
+
+/* ---------- totals ---------- */
+function recalcTotals(){
+  const rows = Array.from(linesContainer.querySelectorAll('.line-row'));
+  let subtotal = 0, tax = 0, discount = 0;
+  rows.forEach(r=>{
+    const qty = Number(r.querySelector('.li-qty').value || 0);
+    const price = Number(r.querySelector('.li-price').value || 0);
+    const tx = Number(r.querySelector('.li-tax').value || 0);
+    const line = qty * price;
+    subtotal += line;
+    tax += (line * tx / 100);
+  });
+  // for simplicity no global discount; you can add field for discount
+  const total = subtotal + tax - discount;
+  subtotalEl.textContent = formatMoney(subtotal);
+  taxTotalEl.textContent = formatMoney(tax);
+  discountTotalEl.textContent = formatMoney(discount);
+  orderTotalEl.textContent = formatMoney(total);
+  return {subtotal, tax, discount, total};
+}
+
+/* ---------- Firestore CRUD ---------- */
+
+async function saveOrderToFirestore(order){
+  if(!order.id) order.id = uid();
+  order.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+  await ordersCol.doc(order.id).set(order, { merge: true });
+  return order.id;
+}
+
+async function deleteOrderFromFirestore(id){
+  await ordersCol.doc(id).delete();
+}
+
+// listen to real-time updates
+ordersCol.orderBy('createdAt', 'desc').onSnapshot(snapshot=>{
+  // rebuild local cache from snapshot
+  orders = [];
+  snapshot.forEach(doc => {
+    const data = doc.data(); data.id = doc.id;
+    // convert timestamps if any
+    if(data.createdAt && data.createdAt.toDate) data.createdAt = data.createdAt.toDate();
+    orders.push(data);
+  });
+  renderOrders();
+});
+
+/* ---------- render / UI ---------- */
+function renderOrders(){
+  // apply filters & sorts
+  let list = [...orders];
+
+  // search
+  const q = (globalSearch.value||'').trim().toLowerCase();
+  if(q){
+    list = list.filter(o => (o.id + ' ' + (o.customer||'') + ' ' + (o.items||[]).map(i=>i.product).join(' ')).toLowerCase().includes(q));
+  }
+
+  // status filter
+  const st = statusFilter.value;
+  if(st !== 'all') list = list.filter(o => o.status === st);
+
+  // sort
+  const sort = sortBy.value;
+  if(sort === 'date_desc') list.sort((a,b)=> (b.createdAt?.getTime?.()||0) - (a.createdAt?.getTime?.()||0));
+  if(sort === 'date_asc') list.sort((a,b)=> (a.createdAt?.getTime?.()||0) - (b.createdAt?.getTime?.()||0));
+  if(sort === 'amount_desc') list.sort((a,b)=> (b.total||0) - (a.total||0));
+  if(sort === 'amount_asc') list.sort((a,b)=> (a.total||0) - (b.total||0));
+
+  ordersTable.innerHTML = '';
+  list.forEach(o=>{
+    const tr = document.createElement('tr');
+    const date = (o.createdAt && o.createdAt.toLocaleString) ? o.createdAt.toLocaleDateString() : (o.date || '');
+    tr.innerHTML = `
+      <td>${date}</td>
+      <td>${o.id}</td>
+      <td>${o.customer || ''}</td>
+      <td>${(o.items||[]).length}</td>
+      <td>${formatMoney(o.total)}</td>
+      <td><span class="status-pill ${o.status==='Pending'?'st-pending':o.status==='Shipped'?'st-shipped':o.status==='Completed'?'st-complete':'st-cancel'}">${o.status}</span></td>
+      <td style="text-align:right">
+        <button class="btn-ghost viewBtn" title="View"><i class="fa-solid fa-eye"></i></button>
+        <button class="btn-ghost editBtn" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+        <button class="btn-ghost delBtn" title="Delete"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    `;
+    // actions
+    tr.querySelector('.viewBtn').addEventListener('click', ()=> showOrderDetails(o));
+    tr.querySelector('.editBtn').addEventListener('click', ()=> openModal(false, o));
+    tr.querySelector('.delBtn').addEventListener('click', async ()=>{
+      if(confirm('Delete this order?')) {
+        await deleteOrderFromFirestore(o.id);
+        alert('Order deleted');
+      }
+    });
+
+    ordersTable.appendChild(tr);
+  });
+
+  ordersCount.textContent = orders.length;
+}
+
+/* ---------- show order details (quick) ---------- */
+function showOrderDetails(o){
+  // simple popup for details
+  const lines = (o.items||[]).map(it=> `${it.product} — ${it.qty} x ${formatMoney(it.price)} (tax ${it.tax}%)` ).join('\n');
+  alert(`Order ${o.id}\nCustomer: ${o.customer}\nStatus: ${o.status}\nTotal: ${formatMoney(o.total)}\n\nItems:\n${lines}\n\nNotes: ${o.notes||''}`);
+}
+
+/* ---------- create or update order from modal ---------- */
+async function saveOrderFromModal(publish = true){
+  // gather data
+  const items = Array.from(linesContainer.querySelectorAll('.line-row')).map(r=>{
+    return {
+      product: r.querySelector('.li-product').value.trim(),
+      qty: Number(r.querySelector('.li-qty').value||0),
+      price: Number(r.querySelector('.li-price').value||0),
+      tax: Number(r.querySelector('.li-tax').value||0)
+    };
+  }).filter(it => it.product && it.qty>0);
+
+  if(items.length === 0){
+    alert('Please add at least one line item with product and quantity.');
+    return;
+  }
+
+  const totals = recalcTotals();
+  const order = {
+    id: editingOrderId || uid(),
+    customer: custName.value.trim() || 'Unknown customer',
+    date: orderDate.value || new Date().toISOString().slice(0,10),
+    notes: orderNotes.value || '',
+    items,
+    subtotal: totals.subtotal,
+    tax: totals.tax,
+    discount: totals.discount,
+    total: totals.total,
+    status: saveStatusEl.value || 'Pending',
+    createdAt: editingOrderId ? (orders.find(x=>x.id===editingOrderId)?.createdAt || new Date()) : firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  await saveOrderToFirestore(order);
+  closeModal();
+}
+
+/* ---------- export functions ---------- */
+function exportCSV(){
+  const rows = [
+    ['ID','Date','Customer','Status','ItemsCount','Subtotal','Tax','Discount','Total']
+  ];
+  orders.forEach(o=>{
+    rows.push([o.id, (o.createdAt && o.createdAt.toLocaleString)? o.createdAt.toLocaleString() : o.date, o.customer, o.status, (o.items||[]).length, o.subtotal, o.tax, o.discount, o.total]);
+  });
+  const csv = rows.map(r => r.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'sales_orders.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportXLSX(){
+  const ws = XLSX.utils.json_to_sheet(orders.map(o=>({
+    ID: o.id, Date: (o.createdAt && o.createdAt.toLocaleString)? o.createdAt.toLocaleString(): o.date, Customer: o.customer, Status: o.status, Items: (o.items||[]).length, Total: o.total
+  })));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'SalesOrders');
+  XLSX.writeFile(wb, 'sales_orders.xlsx');
+}
+
+async function exportPDF(){
+  // Basic PDF: list of orders
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  doc.setFontSize(14);
+  doc.text('Sales Orders — BlueFactory', 40, 50);
+  doc.setFontSize(10);
+  let y = 80;
+  doc.setTextColor(100);
+  orders.forEach((o,i)=>{
+    const line = `${i+1}. ${o.id} | ${o.customer} | ${o.status} | ${formatMoney(o.total)}`;
+    doc.text(line, 40, y);
+    y += 18;
+    if(y > 750){ doc.addPage(); y = 40; }
+  });
+  doc.save('sales_orders.pdf');
+}
+
+/* ---------- listeners ---------- */
+openNewOrderBtn.addEventListener('click', ()=> openModal(true));
+closeModalBtn.addEventListener('click', closeModal);
+addLineBtn.addEventListener('click', ()=> addLine());
+saveOrderBtn.addEventListener('click', ()=> saveOrderFromModal(true));
+saveDraftBtn.addEventListener('click', ()=> saveOrderFromModal(false));
+globalSearch.addEventListener('input', ()=> renderOrders());
+statusFilter.addEventListener('change', ()=> renderOrders());
+sortBy.addEventListener('change', ()=> renderOrders());
+exportCSVBtn.addEventListener('click', exportCSV);
+exportExcelBtn.addEventListener('click', exportXLSX);
+exportPDFBtn.addEventListener('click', exportPDF);
+themeToggle.addEventListener('click', ()=>{
+  const root = document.documentElement;
+  const current = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  root.setAttribute('data-theme', next);
+  localStorage.setItem('bf_theme', next);
+  themeToggle.innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+});
+
+/* ---------- initial theme from localStorage ---------- */
+(function(){
+  const saved = localStorage.getItem('bf_theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  themeToggle.innerHTML = saved === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+})();
+
+/* ---------- auto-load sample one line when modal opens ---------- */
+window.addEventListener('keydown', e=>{
+  if(e.key === 'Escape') closeModal();
+});
+
+/* ---------- initial actions: empty lines container to prepare ---------- */
+linesContainer.innerHTML = '';
+
+</script>
+</body>
+</html>

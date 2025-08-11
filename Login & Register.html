@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blue Factory - Sign In</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet">
+<style>
+    body {
+        margin: 0;
+        font-family: 'Poppins', sans-serif;
+        background: linear-gradient(135deg, #b3d9ff, #e6f2ff);
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .login-container {
+        background: white;
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        width: 350px;
+        text-align: center;
+        animation: fadeIn 0.8s ease-in-out;
+    }
+
+    .login-container h2 {
+        color: #004080;
+        margin-bottom: 20px;
+        font-weight: 600;
+    }
+
+    .login-container input {
+        width: 100%;
+        padding: 12px;
+        margin: 10px 0;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    }
+
+    .login-container input:focus {
+        border-color: #3399ff;
+        box-shadow: 0 0 5px rgba(51,153,255,0.5);
+        outline: none;
+    }
+
+    .login-btn {
+        width: 100%;
+        padding: 12px;
+        background: #3399ff;
+        color: white;
+        font-size: 16px;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+
+    .login-btn:hover {
+        background: #267acc;
+    }
+
+    .links {
+        margin-top: 15px;
+        font-size: 14px;
+    }
+
+    .links a {
+        color: #3399ff;
+        text-decoration: none;
+        transition: color 0.3s ease;
+    }
+
+    .links a:hover {
+        color: #004080;
+    }
+
+    @keyframes fadeIn {
+        from {opacity: 0; transform: translateY(-20px);}
+        to {opacity: 1; transform: translateY(0);}
+    }
+</style>
+</head>
+<body>
+
+<div class="login-container">
+    <h2>Sign In</h2>
+    <input type="email" id="email" placeholder="Enter your email">
+    <input type="password" id="password" placeholder="Enter your password">
+    <button class="login-btn" onclick="login()">Sign In</button>
+    <div class="links">
+        <p>Don't have an account? <a href="signup.html">Sign Up</a></p>
+        <p><a href="#">Forgot Password?</a></p>
+    </div>
+</div>
+
+<script type="module">
+    // Firebase Config
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT_ID.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    window.login = function() {
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+
+        signInWithEmailAndPassword(auth, email, password)
+        .then((userCredential) => {
+            alert("Login Successful!");
+            window.location.href = "dashboard.html"; // بعد تسجيل الدخول
+        })
+        .catch((error) => {
+            alert("Error: " + error.message);
+        });
+    }
+</script>
+
+</body>
+</html>
+

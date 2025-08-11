@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory Accounting — Dashboard</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* ---------- Theme variables ---------- */
+    :root{
+      --blue-900: #0b3d91;
+      --blue-700: #1464c9;
+      --blue-500: #2a9df4;
+      --accent: #17a2b8;
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --muted: #6b7280;
+      --glass: rgba(255,255,255,0.6);
+    }
+
+    [data-theme="dark"]{
+      --bg: #0f1724;
+      --panel: #111827;
+      --muted: #9ca3af;
+      --blue-900: #071733;
+      --blue-700: #0a3a6b;
+      --blue-500: #1f6fb3;
+      --glass: rgba(255,255,255,0.03);
+    }
+
+    /* ---------- Base ---------- */
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg), #e9f2ff 400px);
+      color: #0b1220;
+      transition: background .35s, color .35s;
+      min-height:100vh;
+      --sidebar-w:260px;
+    }
+
+    [data-theme="dark"] body{ color: #e6eef8; }
+
+    /* ---------- Layout ---------- */
+    .app{
+      display:flex;
+      min-height:100vh;
+    }
+
+    /* Sidebar */
+    .sidebar{
+      width:var(--sidebar-w);
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color: #fff;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      position:fixed;
+      left:0; top:0; bottom:0;
+      box-shadow: 0 6px 24px rgba(10,25,60,0.12);
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem; color: #fff; transform:translateY(-1px) }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+    /* Main content area */
+    .main{
+      margin-left:var(--sidebar-w);
+      padding:24px;
+      width:calc(100% - var(--sidebar-w));
+      transition: width .3s, margin-left .3s;
+    }
+
+    /* Top navbar (inside main) */
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      margin-bottom:18px;
+    }
+    .search{
+      flex:1; max-width:540px; display:flex; gap:8px; align-items:center;
+    }
+    .search input{
+      width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,0.06);
+      background:var(--panel); box-shadow: 0 2px 8px rgba(11,18,32,0.04);
+    }
+    .controls{ display:flex; gap:10px; align-items:center; }
+
+    .btn {
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 12px; border-radius:10px; cursor:pointer; border:none; font-weight:600;
+    }
+    .btn-primary{
+      background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff;
+      box-shadow: 0 8px 18px rgba(42,157,244,0.14);
+    }
+    .btn-ghost {
+      background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted);
+    }
+    .icon-btn{ background:var(--panel); padding:8px; border-radius:10px; border:1px solid rgba(15,23,42,0.05) }
+
+    /* Dashboard grid */
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:18px;
+      align-items:start;
+    }
+
+    .card{
+      background:var(--panel);
+      border-radius:12px;
+      padding:16px;
+      box-shadow: 0 6px 20px rgba(16,24,40,0.04);
+      transition: transform .28s, box-shadow .28s;
+      overflow:hidden;
+    }
+    .card:hover{ transform: translateY(-6px); box-shadow: 0 16px 36px rgba(16,24,40,0.08); }
+
+    /* small stat cards */
+    .stat{ grid-column: span 3; display:flex; gap:12px; align-items:center; }
+    .stat .badge{
+      width:54px; height:54px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+      background: linear-gradient(135deg,var(--blue-500),var(--blue-700)); color:#fff; font-size:1.25rem;
+      box-shadow: 0 6px 18px rgba(42,157,244,0.12);
+    }
+    .stat h4{ margin:0; font-size:1.05rem; }
+    .stat p{ margin:0; color:var(--muted); font-size:.9rem }
+
+    /* charts & table placements */
+    .chart-large{ grid-column: span 8; min-height:320px; display:flex; flex-direction:column; gap:12px; }
+    .chart-side{ grid-column: span 4; min-height:320px; }
+    .transactions{ grid-column: span 8; }
+    .inventory{ grid-column: span 4; }
+
+    /* table */
+    table{ width:100%; border-collapse:collapse; font-size:.95rem; }
+    thead th{ text-align:left; color:var(--muted); font-weight:700; padding:10px 6px; font-size:.86rem }
+    tbody tr{ transition: background .18s, transform .18s; border-bottom:1px solid rgba(0,0,0,0.04) }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform: translateX(4px); }
+    td{ padding:12px 6px; vertical-align:middle }
+
+    /* inventory list */
+    .list-item{ display:flex; gap:12px; align-items:center; padding:10px; border-radius:8px; }
+    .product-thumb{ width:56px; height:56px; border-radius:8px; background:#eef7ff; display:flex; align-items:center; justify-content:center; color:var(--blue-700) }
+
+    /* footer inside main */
+    .page-footer{ text-align:center; padding:22px 0; color:var(--muted); }
+
+    /* responsiveness */
+    @media (max-width:1100px){
+      :root{ --sidebar-w:72px } 
+      .sidebar{ width:var(--sidebar-w); padding:12px; }
+      .brand span{ display:none }
+      .main{ margin-left:var(--sidebar-w); width:calc(100% - var(--sidebar-w)); padding:14px; }
+      .stat{ grid-column: span 6 }
+      .chart-large{ grid-column: span 12 }
+      .chart-side{ grid-column: span 12 }
+      .transactions{ grid-column: span 12 }
+      .inventory{ grid-column: span 12 }
+    }
+
+    @media (max-width:640px){
+      .search{ display:none }
+      .sidebar{ position:fixed; z-index:50; }
+    }
+
+    /* small animations */
+    @keyframes popIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+    .card{ animation: popIn .45s ease both }
+
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="app" id="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+      <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+      <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+      <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+    
+
+    <div class="sidebar-footer">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-circle-info"></i></div>
+        <div>
+          <div style="font-weight:700">Factory #12</div>
+          <div style="font-size:.85rem;opacity:.9">Plan: Enterprise</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2 style="margin:0">Dashboard</h2>
+        <div style="color:var(--muted)">Overview & financial snapshot</div>
+      </div>
+
+      <div class="controls">
+        <div class="search">
+          <input id="globalSearch" placeholder="Search invoices, products, transactions..." />
+        </div>
+
+        <button class="btn icon-btn" title="Notifications"><i class="fa-regular fa-bell"></i></button>
+        <button onclick="toggleTheme()" class="btn icon-btn" id="themeToggle" title="Toggle dark mode"><i class="fa-regular fa-moon"></i></button>
+        <button class="btn btn-primary" id="newInvoiceBtn"><i class="fa-solid fa-plus"></i> New Invoice</button>
+      </div>
+    </div>
+
+    <!-- Grid -->
+    <section class="grid">
+
+      <!-- Stats -->
+      <div class="stat card">
+        <div class="badge"><i class="fa-solid fa-dollar-sign"></i></div>
+        <div>
+          <h4 id="statRevenue">$58,240</h4>
+          <p>Revenue (MTD)</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#f97316,#f59e0b)"><i class="fa-solid fa-receipt"></i></div>
+        <div>
+          <h4 id="statExpenses">$31,760</h4>
+          <p>Expenses (MTD)</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#34d399,#10b981)"><i class="fa-solid fa-chart-line-up"></i></div>
+        <div>
+          <h4 id="statProfit">$26,480</h4>
+          <p>Net Profit (MTD)</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)"><i class="fa-solid fa-box"></i></div>
+        <div>
+          <h4 id="statStock">1,240</h4>
+          <p>SKUs in stock</p>
+        </div>
+      </div>
+
+      <!-- Big Chart -->
+      <div class="chart-large card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>Revenue vs Expenses (Last 6 months)</strong>
+            <div style="color:var(--muted);font-size:.95rem">Monthly performance</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-ghost" onclick="updateRandom()">Refresh</button>
+            <button class="btn btn-ghost" onclick="downloadChart()">Export PNG</button>
+          </div>
+        </div>
+        <canvas id="revenueChart" style="width:100%;max-height:320px;"></canvas>
+      </div>
+
+      <!-- Side donut -->
+      <div class="chart-side card">
+        <strong>Sales by Category</strong>
+        <div style="color:var(--muted);font-size:.9rem;margin-bottom:10px">This month</div>
+        <canvas id="categoryDonut" style="max-height:260px"></canvas>
+        <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+          <div style="font-weight:700">Top categories</div>
+          <div style="color:var(--muted)">&nbsp;| Electronics • Packaging • Spare parts</div>
+        </div>
+      </div>
+
+      <!-- Transactions table -->
+      <div class="transactions card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <strong>Recent Transactions</strong><div style="color:var(--muted);font-size:.9rem">Latest accounting entries</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <select id="txFilter" class="btn btn-ghost" onchange="applyTxFilter()">
+              <option value="all">All</option>
+              <option value="invoice">Invoice</option>
+              <option value="payment">Payment</option>
+              <option value="expense">Expense</option>
+            </select>
+            <button class="btn btn-ghost" onclick="exportTxCSV()">Export CSV</button>
+          </div>
+        </div>
+
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Reference</th>
+                <th>Type</th>
+                <th>Account</th>
+                <th>Debit</th>
+                <th>Credit</th>
+                
+              </tr>
+            </thead>
+            <tbody id="txBody">
+              <!-- Filled by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Inventory -->
+      <div class="inventory card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>Low stock items</strong>
+            <div style="color:var(--muted);font-size:.9rem">Items needing reorder</div>
+          </div>
+          <button class="btn btn-ghost" onclick="openInventory()">View all</button>
+        </div>
+
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+          <div class="list-item" title="Blender">
+            <div class="product-thumb"><i class="fa-solid fa-wrench"></i></div>
+            <div>
+              <div style="font-weight:700">Moulinex Blender LM2421EG</div>
+              <div style="color:var(--muted);font-size:.9rem">Stock: 3 • Reorder at 10</div>
+            </div>
+            <div style="margin-left:auto;color:#f97316;font-weight:700">Low</div>
+          </div>
+
+          <div class="list-item">
+            <div class="product-thumb"><i class="fa-solid fa-plug"></i></div>
+            <div>
+              <div style="font-weight:700">Power Supply Model A</div>
+              <div style="color:var(--muted);font-size:.9rem">Stock: 7 • Reorder at 20</div>
+            </div>
+            <div style="margin-left:auto;color:#10b981;font-weight:700">OK</div>
+          </div>
+
+          <div class="list-item">
+            <div class="product-thumb"><i class="fa-solid fa-cogs"></i></div>
+            <div>
+              <div style="font-weight:700">Gear Set 200</div>
+              <div style="color:var(--muted);font-size:.9rem">Stock: 1 • Reorder at 15</div>
+            </div>
+            <div style="margin-left:auto;color:#ef4444;font-weight:700">Critical</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <div class="page-footer">© 2025 FinMate — Accounting for Manufacturers</div>
+  </main>
+
+</div>
+
+<script>
+  // Theme handling & remember
+  (function(){
+    const dt = document.documentElement;
+    const saved = localStorage.getItem('bf_theme') || 'light';
+    dt.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+    if(saved === 'dark') document.getElementById('themeToggle').innerHTML = '<i class="fa-regular fa-sun"></i>';
+  })();
+
+  function toggleTheme(){
+    const dt = document.documentElement;
+    const current = dt.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    dt.setAttribute('data-theme', next);
+    localStorage.setItem('bf_theme', next);
+    document.getElementById('themeToggle').innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  }
+
+  // Sample data
+  const txData = [
+    { date:'2025-08-01', ref:'INV-1001', type:'invoice', acct:'Sales', debit:8200, credit:0 },
+    { date:'2025-08-02', ref:'PAY-2302', type:'payment', acct:'Bank', debit:0, credit:4200 },
+    { date:'2025-08-03', ref:'EXP-3001', type:'expense', acct:'Office Supplies', debit:200, credit:0 },
+    { date:'2025-08-04', ref:'INV-1002', type:'invoice', acct:'Sales', debit:9600, credit:0 },
+    { date:'2025-08-05', ref:'PAY-2303', type:'payment', acct:'Bank', debit:0, credit:5600 },
+    { date:'2025-08-06', ref:'INV-1003', type:'invoice', acct:'Sales', debit:10200, credit:0 }
+  ];
+
+  // Populate transactions table
+  function renderTx(list = txData){
+    const tbody = document.getElementById('txBody');
+    tbody.innerHTML = '';
+    list.forEach(tx=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${tx.date}</td>
+        <td>${tx.ref}</td>
+        <td style="text-transform:capitalize">${tx.type}</td>
+        <td>${tx.acct}</td>
+        <td style="color:${tx.debit? '#0b6623':'#666'}">${tx.debit? ('$'+tx.debit.toLocaleString()): '-'}</td>
+        <td style="color:${tx.credit? '#b91c1c':'#666'}">${tx.credit? ('$'+tx.credit.toLocaleString()): '-'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+  renderTx();
+
+  // Filter transactions
+  function applyTxFilter(){
+    const v = document.getElementById('txFilter').value;
+    renderTx(v === 'all' ? txData : txData.filter(x=>x.type === v));
+  }
+
+  // Export CSV
+  function exportTxCSV(){
+    const rows = [['Date','Reference','Type','Account','Debit','Credit']];
+    txData.forEach(r=> rows.push([r.date,r.ref,r.type,r.acct,r.debit,r.credit]));
+    const csv = rows.map(r=> r.map(c=> `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'transactions.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Charts
+  const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun'];
+  let revenueData = [8200, 9600, 10200, 9400, 8800, 10040];
+  let expenseData = [4200, 5600, 4800, 5300, 5400, 6260];
+
+  const revenueChart = new Chart(revenueCtx, {
+    type:'bar',
+    data:{
+      labels: months,
+      datasets:[
+        { label:'Revenue', data: revenueData, backgroundColor: 'rgba(42,157,244,0.9)', borderRadius:6 },
+        { label:'Expenses', data: expenseData, backgroundColor: 'rgba(231,111,81,0.9)', borderRadius:6 }
+      ]
+    },
+    options:{
+      responsive:true,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ position:'top' }, tooltip:{ enabled:true } },
+      scales:{
+        x:{ stacked:false, grid:{ display:false } },
+        y:{ ticks:{beginAtZero:true}, grid:{ color:'rgba(0,0,0,0.04)' } }
+      }
+    }
+  });
+
+  // donut
+  const catCtx = document.getElementById('categoryDonut').getContext('2d');
+  const catChart = new Chart(catCtx, {
+    type:'doughnut',
+    data:{
+      labels:['Electronics','Packaging','Spare parts','Accessories'],
+      datasets:[{ data:[55,20,15,10], backgroundColor:['#2a9df4','#17a2b8','#34d399','#f59e0b'] }]
+    },
+    options:{ plugins:{ legend:{ position:'bottom' } } }
+  });
+
+  // small helpers
+  function updateRandom(){
+    // pretend to fetch new numbers
+    revenueData = revenueData.map(v => Math.round(v * (0.9 + Math.random()*0.2)));
+    expenseData = expenseData.map(v => Math.round(v * (0.9 + Math.random()*0.25)));
+    revenueChart.data.datasets[0].data = revenueData;
+    revenueChart.data.datasets[1].data = expenseData;
+    revenueChart.update();
+    // update stat cards (basic sums)
+    document.getElementById('statRevenue').textContent = '$' + revenueData.reduce((a,b)=>a+b,0).toLocaleString();
+    document.getElementById('statExpenses').textContent = '$' + expenseData.reduce((a,b)=>a+b,0).toLocaleString();
+    document.getElementById('statProfit').textContent = '$' + (revenueData.reduce((a,b)=>a+b,0) - expenseData.reduce((a,b)=>a+b,0)).toLocaleString();
+  }
+
+  function downloadChart(){
+    const link = document.createElement('a');
+    link.href = document.getElementById('revenueChart').toDataURL('image/png', 1);
+    link.download = 'revenue-chart.png';
+    link.click();
+  }
+
+  function exportChartDataCSV(){
+    // optional helper if needed
+  }
+
+  function openInventory(){
+    // placeholder navigation
+    alert('Open inventory list (navigate to Inventory page)');
+  }
+
+  // search in header (simple filter on transactions)
+  document.getElementById('globalSearch').addEventListener('input', function(){
+    const q = this.value.trim().toLowerCase();
+    if(!q) return renderTx();
+    const filtered = txData.filter(t => [t.ref,t.acct,t.type].join(' ').toLowerCase().includes(q));
+    renderTx(filtered);
+  });
+
+  // New invoice button placeholder
+  document.getElementById('newInvoiceBtn').addEventListener('click', ()=>{
+    alert('Open Create Invoice modal/page (to be implemented)');
+  });
+
+  // initial stat update
+  (function initStats(){
+    document.getElementById('statRevenue').textContent = '$' + revenueData.reduce((a,b)=>a+b,0).toLocaleString();
+    document.getElementById('statExpenses').textContent = '$' + expenseData.reduce((a,b)=>a+b,0).toLocaleString();
+    document.getElementById('statProfit').textContent = '$' + (revenueData.reduce((a,b)=>a+b,0) - expenseData.reduce((a,b)=>a+b,0)).toLocaleString();
+    document.getElementById('statStock').textContent = '1,240';
+  })();
+
+</script>
+</body>
+</html>

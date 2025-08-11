@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Chart of Accounts</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    :root{
+      --blue-900:#0b3d91;
+      --blue-700:#1464c9;
+      --blue-500:#2a9df4;
+      --muted:#6b7280;
+      --panel:#ffffff;
+      --bg:#f4f7fb;
+      --accent:#17a2b8;
+      --glass: rgba(255,255,255,0.6);
+    }
+    [data-theme="dark"]{
+      --bg:#071226;
+      --panel:#0f1724;
+      --muted:#9ca3af;
+      --blue-900:#071733;
+      --blue-700:#0a3a6b;
+      --blue-500:#1f6fb3;
+      --glass: rgba(255,255,255,0.02);
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg), #e9f7ff 280px);
+      color:#071227;
+      transition:background .3s,color .3s;
+      min-height:100vh;
+      --sidebar-w:260px;
+    }
+    [data-theme="dark"] body{ color:#e6eef8 }
+
+    .app{ display:flex; min-height:100vh; }
+
+    /* Sidebar */
+    .sidebar{
+      width:var(--sidebar-w);
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color: #fff;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      position:fixed;
+      left:0; top:0; bottom:0;
+      box-shadow: 0 6px 24px rgba(10,25,60,0.12);
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem; color: #fff; transform:translateY(-1px) }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+    /* Main */
+    .main{ margin-left:var(--sidebar-w); padding:22px; width:calc(100% - var(--sidebar-w)); transition:margin .25s; }
+
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+    .topbar h2{ margin:0; font-size:1.2rem }
+    .search{ display:flex; gap:8px; align-items:center; max-width:600px; width:100%; }
+    .search input{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(11,18,32,0.06); background:var(--panel); box-shadow: 0 2px 8px rgba(11,18,32,0.03) }
+
+    .controls{ display:flex; gap:8px; align-items:center; }
+
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:9px; cursor:pointer; border:none; font-weight:600; background:transparent }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; box-shadow: 0 8px 18px rgba(42,157,244,0.12) }
+    .btn-ghost{ background:transparent; border:1px solid rgba(11,18,32,0.06); color:var(--muted) }
+    .icon-btn{ background:var(--panel); padding:8px; border-radius:10px; border:1px solid rgba(11,18,32,0.05) }
+
+    /* Grid */
+    .grid{ display:grid; grid-template-columns: repeat(12, 1fr); gap:16px; align-items:start; }
+
+    .card{ background:var(--panel); border-radius:12px; padding:14px; box-shadow: 0 6px 20px rgba(16,24,40,0.04); transition:transform .25s, box-shadow .25s; overflow:hidden; }
+    .card:hover{ transform:translateY(-6px); box-shadow: 0 16px 36px rgba(16,24,40,0.08); }
+
+    .stat{ grid-column: span 3; display:flex; gap:12px; align-items:center; }
+    .badge{ width:54px; height:54px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,var(--blue-500),var(--blue-700)); color:#fff; font-size:1.2rem }
+
+    /* Table area uses 8/4 columns */
+    .accounts-table{ grid-column: span 8; }
+    .accounts-side{ grid-column: span 4; }
+
+    table{ width:100%; border-collapse:collapse; font-size:0.95rem; min-width:600px; }
+    thead th{ text-align:left; color:var(--muted); font-weight:700; padding:10px; font-size:0.85rem; border-bottom:1px solid rgba(0,0,0,0.04) }
+    tbody tr{ transition: background .18s, transform .18s; border-bottom:1px solid rgba(0,0,0,0.04) }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform:translateX(6px) }
+    td{ padding:10px; vertical-align:middle }
+
+    .type-pill{ padding:6px 10px; border-radius:999px; font-size:.82rem; font-weight:700; color:#fff; display:inline-block }
+    .type-asset{ background:linear-gradient(135deg,#60a5fa,#1d4ed8) }
+    .type-liability{ background:linear-gradient(135deg,#f97316,#fb923c) }
+    .type-equity{ background:linear-gradient(135deg,#7c3aed,#6d28d9) }
+    .type-income{ background:linear-gradient(135deg,#10b981,#34d399) }
+    .type-expense{ background:linear-gradient(135deg,#ef4444,#fb7185) }
+
+    .muted{ color:var(--muted) }
+
+    /* sidebar scroll - ensure visible scrollbar on large sets */
+    .nav-links{ max-height:50vh; overflow:auto; padding-right:6px; }
+
+    /* Modal */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(3,6,23,0.45); display:none; align-items:center; justify-content:center; padding:16px; z-index:50 }
+    .modal{ width:100%; max-width:720px; background:var(--panel); border-radius:12px; padding:18px; box-shadow:0 10px 40px rgba(2,6,23,0.4) }
+    .modal h3{ margin:0 0 8px }
+    .form-row{ display:flex; gap:8px; flex-wrap:wrap }
+    .form-row .form-group{ flex:1; min-width:160px; display:flex; flex-direction:column; gap:6px }
+    .form-group input, .form-group select, .form-group textarea{ padding:10px; border-radius:8px; border:1px solid rgba(11,18,32,0.06); background:transparent }
+
+    /* small list on right */
+    .mini-list .item { display:flex; align-items:center; gap:12px; padding:8px; border-radius:8px; transition:transform .2s }
+    .mini-list .item:hover{ transform:translateX(6px); background:linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)) }
+
+    .page-footer{ grid-column:1 / -1; text-align:center; padding:18px 0; color:var(--muted) }
+
+    /* responsive */
+    @media (max-width:1100px){
+      :root{ --sidebar-w:72px }
+      .sidebar{ width:var(--sidebar-w); padding:12px }
+      .brand span { display:none }
+      .main{ margin-left:var(--sidebar-w); width:calc(100% - var(--sidebar-w)); padding:12px }
+      .stat{ grid-column:span 6 }
+      .accounts-table{ grid-column:span 12 }
+      .accounts-side{ grid-column:span 12 }
+      table{ min-width:100% }
+    }
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="app" id="app">
+
+   <!-- SIDEBAR -->
+   <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+      <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+      <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+      <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+    
+
+    <div class="sidebar-footer">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-circle-info"></i></div>
+        <div>
+          <div style="font-weight:700">Factory #12</div>
+          <div style="font-size:.85rem;opacity:.9">Plan: Enterprise</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main" role="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2>Chart of Accounts</h2>
+        <div style="color:var(--muted)">Manage your ledger structure & accounts</div>
+      </div>
+
+      <div class="controls" style="align-items:center">
+        <div class="search" role="search" aria-label="Search accounts">
+          <input id="accountSearch" placeholder="Search account name, number, or type..." />
+        </div>
+
+        <select id="typeFilter" class="btn btn-ghost" title="Filter by type">
+          <option value="all">All types</option>
+          <option value="Asset">Asset</option>
+          <option value="Liability">Liability</option>
+          <option value="Equity">Equity</option>
+          <option value="Income">Income</option>
+          <option value="Expense">Expense</option>
+        </select>
+
+        <button class="btn icon-btn" id="importBtn" title="Import JSON"><i class="fa-solid fa-file-import"></i></button>
+        <button class="btn icon-btn" id="exportBtn" title="Export CSV"><i class="fa-solid fa-file-csv"></i></button>
+        <button class="btn btn-primary" id="openAddModal"><i class="fa-solid fa-plus"></i> Add Account</button>
+        <button class="btn icon-btn" id="themeToggle" title="Toggle dark mode"><i class="fa-regular fa-moon"></i></button>
+      </div>
+    </div>
+
+    <section class="grid" aria-label="Main content">
+
+      <!-- summary stats -->
+      <div class="stat card">
+        <div class="badge"><i class="fa-solid fa-wallet"></i></div>
+        <div>
+          <h4 id="totalAccounts">34</h4>
+          <p>Accounts total</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#34d399,#10b981)"><i class="fa-solid fa-chart-line-up"></i></div>
+        <div>
+          <h4 id="activeAccounts">29</h4>
+          <p>Active accounts</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#f97316,#f59e0b)"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+        <div>
+          <h4 id="incomeCount">6</h4>
+          <p>Income accounts</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)"><i class="fa-solid fa-list"></i></div>
+        <div>
+          <h4 id="expenseCount">10</h4>
+          <p>Expense accounts</p>
+        </div>
+      </div>
+
+      <!-- accounts table -->
+      <div class="accounts-table card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <strong>Accounts</strong>
+            <div class="muted" style="font-size:.92rem">Chart of Accounts — list & manage</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-ghost" onclick="collapseAll()">Collapse</button>
+            <button class="btn btn-ghost" onclick="expandAll()">Expand</button>
+          </div>
+        </div>
+
+        <div style="overflow:auto">
+          <table aria-describedby="Accounts table">
+            <thead>
+              <tr>
+                <th style="width:120px">Account #</th>
+                <th>Account Name</th>
+                <th style="width:120px">Type</th>
+                <th style="width:160px">Parent</th>
+                <th style="width:120px">Balance</th>
+                <th style="width:120px">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="accountsBody">
+              <!-- JS injects rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- right side: quick list & instructions -->
+      <aside class="accounts-side card">
+        <strong>Quick actions</strong>
+        <div class="muted" style="font-size:.9rem;margin-bottom:12px">Shortcuts & tips</div>
+
+        <div class="mini-list" style="display:flex;flex-direction:column;gap:8px">
+          <div class="item"><i class="fa-solid fa-plus" style="width:26px"></i> Create account groups</div>
+          <div class="item"><i class="fa-solid fa-sitemap" style="width:26px"></i> Reorder accounts</div>
+          <div class="item"><i class="fa-solid fa-file-export" style="width:26px"></i> Export structure</div>
+          <div class="item"><i class="fa-solid fa-building-shield" style="width:26px"></i> Lock posting (audit)</div>
+        </div>
+
+        <hr style="margin:12px 0">
+
+        <strong>Types legend</strong>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+          <div><span class="type-pill type-asset">Asset</span></div>
+          <div><span class="type-pill type-liability">Liability</span></div>
+          <div><span class="type-pill type-equity">Equity</span></div>
+          <div><span class="type-pill type-income">Income</span></div>
+          <div><span class="type-pill type-expense">Expense</span></div>
+        </div>
+      </aside>
+
+      <div class="page-footer">© 2025 BlueFactory · Accounting for Manufacturers</div>
+    </section>
+
+  </main>
+</div>
+
+<!-- modal -->
+<div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle">Add Account</h3>
+    <div style="font-size:.92rem;color:var(--muted);margin-bottom:12px">Create or edit an account in your chart</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Account Number</label>
+        <input id="accountNumber" placeholder="e.g. 1001" />
+      </div>
+      <div class="form-group">
+        <label>Account Name</label>
+        <input id="accountName" placeholder="Cash / Accounts Receivable" />
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select id="accountType">
+          <option>Asset</option>
+          <option>Liability</option>
+          <option>Equity</option>
+          <option>Income</option>
+          <option>Expense</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Parent Account (optional)</label>
+        <select id="accountParent"><option value="">— none —</option></select>
+      </div>
+      <div class="form-group">
+        <label>Starting Balance</label>
+        <input id="accountBalance" type="number" step="0.01" value="0" />
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="accountStatus"><option>Active</option><option>Inactive</option></select>
+      </div>
+      <div class="form-group" style="flex-basis:100%">
+        <label>Description</label>
+        <textarea id="accountDesc" rows="2" placeholder="Notes..."></textarea>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+      <button class="btn btn-ghost" id="closeModal">Cancel</button>
+      <button class="btn btn-primary" id="saveAccount">Save Account</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  /***********************
+   * Local data & utilities
+   ***********************/
+  const sampleAccounts = [
+    { id: '1000', number:'1000', name:'Cash', type:'Asset', parent:'', balance:12000.00, status:'Active', desc:'Petty cash & bank' },
+    { id: '1010', number:'1010', name:'Accounts Receivable', type:'Asset', parent:'', balance:8200.00, status:'Active', desc:'' },
+    { id: '2000', number:'2000', name:'Accounts Payable', type:'Liability', parent:'', balance:5600.00, status:'Active', desc:'' },
+    { id: '3000', number:'3000', name:'Equity', type:'Equity', parent:'', balance:0.00, status:'Active', desc:'' },
+    { id: '4000', number:'4000', name:'Sales Revenue', type:'Income', parent:'', balance:26000.00, status:'Active', desc:'' },
+    { id: '5000', number:'5000', name:'Cost of Goods Sold', type:'Expense', parent:'', balance:12000.00, status:'Active', desc:'' },
+    { id: '5100', number:'5100', name:'Office Supplies', type:'Expense', parent:'5000', balance:200.00, status:'Active', desc:'' }
+  ];
+
+  const LS_KEY = 'bf_coa_v1';
+  let accounts = [];
+
+  function loadAccounts(){
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){
+      try {
+        accounts = JSON.parse(raw);
+      } catch(e){
+        console.error('Failed to parse saved accounts', e);
+        accounts = sampleAccounts.slice();
+      }
+    } else {
+      accounts = sampleAccounts.slice();
+      saveAccounts();
+    }
+  }
+  function saveAccounts(){
+    localStorage.setItem(LS_KEY, JSON.stringify(accounts));
+    refreshUI();
+  }
+
+  function uid(){ return 'a'+Math.random().toString(36).slice(2,9); }
+
+  /***********************
+   * Render functions
+   ***********************/
+  const accountsBody = document.getElementById('accountsBody');
+  const accountSearch = document.getElementById('accountSearch');
+  const typeFilter = document.getElementById('typeFilter');
+
+  function formatMoney(v){
+    return v === 0 ? '-' : '$' + Number(v).toLocaleString();
+  }
+
+  function findAccountName(id){
+    if(!id) return '';
+    const a = accounts.find(x=>x.id === id || x.number === id);
+    return a ? a.name : '';
+  }
+
+  function renderAccounts(filterText = '', type = 'all'){
+    accountsBody.innerHTML = '';
+    const q = filterText.trim().toLowerCase();
+    const rows = accounts
+      .filter(a => (type === 'all' || a.type === type))
+      .filter(a => !q || (a.name+' '+a.number+' '+a.type).toLowerCase().includes(q))
+      .sort((a,b)=> (a.number||'').localeCompare(b.number||''));
+
+    rows.forEach(a=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${a.number || ''}</td>
+        <td>
+          <div style="font-weight:700">${a.name}</div>
+          <div class="muted" style="font-size:.85rem">${a.desc || ''}</div>
+        </td>
+        <td><span class="type-pill type-${a.type.toLowerCase()}">${a.type}</span></td>
+        <td>${findAccountName(a.parent) || '-'}</td>
+        <td>${formatMoney(a.balance)}</td>
+        <td>
+          <button class="btn btn-ghost" onclick="openEditAccount('${a.id}')"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-ghost" onclick="confirmDelete('${a.id}')"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      `;
+      accountsBody.appendChild(tr);
+    });
+
+    // stats
+    document.getElementById('totalAccounts').textContent = accounts.length;
+    document.getElementById('activeAccounts').textContent = accounts.filter(a=>a.status==='Active').length;
+    document.getElementById('incomeCount').textContent = accounts.filter(a=>a.type==='Income').length;
+    document.getElementById('expenseCount').textContent = accounts.filter(a=>a.type==='Expense').length;
+  }
+
+  /***********************
+   * Modal & form handling
+   ***********************/
+  const modalBackdrop = document.getElementById('modalBackdrop');
+  const openAddModalBtn = document.getElementById('openAddModal');
+  const closeModalBtn = document.getElementById('closeModal');
+  const saveAccountBtn = document.getElementById('saveAccount');
+
+  const accountNumberInput = document.getElementById('accountNumber');
+  const accountNameInput = document.getElementById('accountName');
+  const accountTypeSelect = document.getElementById('accountType');
+  const accountParentSelect = document.getElementById('accountParent');
+  const accountBalanceInput = document.getElementById('accountBalance');
+  const accountStatusSelect = document.getElementById('accountStatus');
+  const accountDescInput = document.getElementById('accountDesc');
+
+  let editingId = null;
+
+  function openModal(){
+    populateParentSelect();
+    modalBackdrop.style.display = 'flex';
+    modalBackdrop.setAttribute('aria-hidden','false');
+    accountNumberInput.focus();
+  }
+  function closeModal(){
+    modalBackdrop.style.display = 'none';
+    modalBackdrop.setAttribute('aria-hidden','true');
+    clearModal();
+  }
+  function clearModal(){
+    editingId = null;
+    accountNumberInput.value = '';
+    accountNameInput.value = '';
+    accountTypeSelect.value = 'Asset';
+    accountParentSelect.value = '';
+    accountBalanceInput.value = 0;
+    accountStatusSelect.value = 'Active';
+    accountDescInput.value = '';
+  }
+
+  openAddModalBtn.addEventListener('click', ()=>{ clearModal(); openModal(); document.getElementById('modalTitle').textContent = 'Add Account' });
+  closeModalBtn.addEventListener('click', closeModal);
+  modalBackdrop.addEventListener('click', (e)=>{ if(e.target === modalBackdrop) closeModal(); });
+
+  function populateParentSelect(){
+    accountParentSelect.innerHTML = '<option value="">— none —</option>';
+    accounts.forEach(a=>{
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = `${a.number || a.id} — ${a.name}`;
+      accountParentSelect.appendChild(opt);
+    });
+  }
+
+  saveAccountBtn.addEventListener('click', ()=>{
+    const num = accountNumberInput.value.trim();
+    const name = accountNameInput.value.trim();
+    const type = accountTypeSelect.value;
+    const parent = accountParentSelect.value || '';
+    const balance = parseFloat(accountBalanceInput.value) || 0;
+    const status = accountStatusSelect.value;
+    const desc = accountDescInput.value.trim();
+
+    if(!name){
+      alert('Account name is required');
+      return;
+    }
+
+    if(editingId){
+      // update
+      const idx = accounts.findIndex(x=>x.id===editingId);
+      if(idx>=0){
+        accounts[idx] = { ...accounts[idx], number:num, name, type, parent, balance, status, desc };
+      }
+    } else {
+      // new
+      const id = uid();
+      accounts.push({ id, number:num, name, type, parent, balance, status, desc });
+    }
+    saveAccounts();
+    closeModal();
+  });
+
+  function openEditAccount(id){
+    const acc = accounts.find(a=>a.id===id);
+    if(!acc) return;
+    editingId = id;
+    accountNumberInput.value = acc.number || '';
+    accountNameInput.value = acc.name || '';
+    accountTypeSelect.value = acc.type || 'Asset';
+    populateParentSelect();
+    accountParentSelect.value = acc.parent || '';
+    accountBalanceInput.value = acc.balance || 0;
+    accountStatusSelect.value = acc.status || 'Active';
+    accountDescInput.value = acc.desc || '';
+    document.getElementById('modalTitle').textContent = 'Edit Account';
+    openModal();
+  }
+
+  function confirmDelete(id){
+    const acc = accounts.find(a=>a.id===id);
+    if(!acc) return;
+    if(!confirm(`Delete account "${acc.name}"? This action cannot be undone.`)) return;
+    accounts = accounts.filter(a=>a.id !== id);
+    saveAccounts();
+  }
+
+  /***********************
+   * Import / Export
+   ***********************/
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const rows = [['id','number','name','type','parent','balance','status','desc']];
+    accounts.forEach(a=> rows.push([a.id,a.number,a.name,a.type,a.parent,a.balance,a.status,a.desc]));
+    const csv = rows.map(r=> r.map(c=> `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'chart-of-accounts.csv'; a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('importBtn').addEventListener('click', ()=>{
+    const input = document.createElement('input'); input.type='file'; input.accept='application/json,text/json';
+    input.addEventListener('change', e=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ev=>{
+        try {
+          const data = JSON.parse(ev.target.result);
+          if(Array.isArray(data)){
+            // basic validation: array of objects
+            accounts = data.map(d => ({
+              id: d.id || uid(),
+              number: d.number || '',
+              name: d.name || 'Unnamed',
+              type: d.type || 'Asset',
+              parent: d.parent || '',
+              balance: Number(d.balance || 0),
+              status: d.status || 'Active',
+              desc: d.desc || ''
+            }));
+            saveAccounts();
+            alert('Imported accounts from JSON.');
+          } else {
+            alert('Invalid JSON: expected an array of accounts.');
+          }
+        } catch(err){ alert('Failed to parse JSON: '+err.message); }
+      };
+      reader.readAsText(file);
+    });
+    input.click();
+  });
+
+  /***********************
+   * Filters & search
+   ***********************/
+  accountSearch.addEventListener('input', ()=> renderAccounts(accountSearch.value, typeFilter.value));
+  typeFilter.addEventListener('change', ()=> renderAccounts(accountSearch.value, typeFilter.value));
+
+  /***********************
+   * Additional helpers
+   ***********************/
+  function collapseAll(){ /* placeholder if you implement grouping */ alert('Collapse all (not implemented)') }
+  function expandAll(){ alert('Expand all (not implemented)') }
+
+  // Theme toggle
+  const themeToggle = document.getElementById('themeToggle');
+  (function initTheme(){
+    const saved = localStorage.getItem('bf_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+    themeToggle.innerHTML = saved === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  })();
+  themeToggle.addEventListener('click', ()=>{
+    const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('bf_theme', next);
+    themeToggle.innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  });
+
+  /***********************
+   * Init
+   ***********************/
+  loadAccounts();
+  renderAccounts();
+
+  // expose a couple for console/testing
+  window._bf = { accounts, saveAccounts, renderAccounts };
+
+</script>
+</body>
+</html>

@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Inventory</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Chart.js (optional if you want charts later) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <!-- jsPDF + autoTable for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    :root{
+      --blue-900: #0b3d91;
+      --blue-700: #1464c9;
+      --blue-500: #2a9df4;
+      --muted: #6b7280;
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+    }
+    [data-theme="dark"]{
+      --bg: #0f1724;
+      --panel: #111827;
+      --muted: #9ca3af;
+      --blue-900: #071733;
+      --blue-700: #0a3a6b;
+      --blue-500: #1f6fb3;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg), #e9f2ff 300px);
+      color: #0b1220; transition:background .35s,color .35s;
+      --sidebar-w:260px;
+    }
+    .app{ display:flex; min-height:100vh; }
+
+    /* Sidebar */
+    .sidebar{
+      width:var(--sidebar-w); background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color:#fff; padding:18px; display:flex; flex-direction:column; gap:14px; position:fixed; left:0; top:0; bottom:0;
+    }
+    .brand{ display:flex; gap:10px; align-items:center; font-weight:700; }
+    .brand i{ font-size:1.3rem }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+    /* main */
+    .main{ margin-left:var(--sidebar-w); padding:20px; width:calc(100% - var(--sidebar-w)); }
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+    .search input{ padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,0.06); width:380px; background:var(--panel) }
+    .controls{ display:flex; gap:8px; align-items:center }
+    .btn{ padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:600; border:none }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; box-shadow: 0 8px 18px rgba(42,157,244,0.14) }
+    .btn-ghost{ background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted) }
+    .icon-btn{ background:var(--panel); padding:8px; border-radius:8px; border:1px solid rgba(15,23,42,0.05) }
+
+    /* content grid */
+    .grid{ display:grid; grid-template-columns: repeat(12,1fr); gap:16px; }
+    .card{ background:var(--panel); border-radius:10px; padding:14px; box-shadow: 0 6px 24px rgba(16,24,40,0.04); transition:transform .25s }
+    .card:hover{ transform:translateY(-6px) }
+
+    .stat{ grid-column: span 3; display:flex; gap:12px; align-items:center }
+    .stat .badge{ width:56px; height:56px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,var(--blue-500),var(--blue-700)); color:#fff; font-size:1.15rem }
+    .stat h4{ margin:0 } .stat p{ margin:0; color:var(--muted) }
+
+    /* table area */
+    .table-wrap{ grid-column: span 8; overflow:auto }
+    table{ width:100%; border-collapse:collapse; font-size:.95rem; min-width:700px }
+    thead th{ text-align:left; padding:10px 8px; background:rgba(0,0,0,0.03); color:var(--muted); font-weight:700 }
+    tbody td{ padding:12px 8px; border-bottom:1px solid rgba(0,0,0,0.04) }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform:translateX(6px) }
+
+    .controls-row{ display:flex; gap:10px; align-items:center; margin-bottom:10px }
+
+    /* inventory list */
+    .inventory-side{ grid-column: span 4; display:flex; flex-direction:column; gap:10px }
+    .list-item{ display:flex; gap:12px; align-items:center; padding:10px; border-radius:8px; }
+    .product-thumb{ width:56px; height:56px; border-radius:8px; background:#eef7ff; display:flex; align-items:center; justify-content:center; color:var(--blue-700) }
+
+    /* modal */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(2,6,23,0.5); display:flex; align-items:center; justify-content:center; z-index:9999; animation:fadeIn .16s }
+    .modal { background:var(--panel); width:720px; max-width:95%; border-radius:12px; padding:18px; box-shadow:0 20px 60px rgba(10,25,60,0.35) }
+    .modal .row{ display:flex; gap:12px }
+    .modal .col{ flex:1 }
+    .close-btn{ background:transparent; border:none; font-size:1.1rem; cursor:pointer; color:var(--muted) }
+    @keyframes fadeIn{ from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none} }
+
+    /* responsive */
+    @media (max-width:1100px){
+      :root{ --sidebar-w:72px } .brand span{ display:none }
+      .main{ margin-left:var(--sidebar-w); width:calc(100% - var(--sidebar-w)) }
+      .stat{ grid-column: span 6 }
+      .table-wrap{ grid-column: span 12 }
+      .inventory-side{ grid-column: span 12 }
+    }
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate</span></div>
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+      <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+      <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+      <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+    <div class="sidebar-footer">Factory #12 • Plan: Enterprise</div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;gap:12px;align-items:center">
+        <h2 style="margin:0">Inventory</h2>
+        <div style="color:var(--muted)">Manage SKUs, stock levels & suppliers</div>
+      </div>
+
+      <div class="controls">
+        <div class="search"><input id="searchInput" placeholder="Search SKUs, name, supplier..." /></div>
+        <button class="btn icon-btn" id="themeToggle" title="Toggle theme"><i class="fa-regular fa-moon"></i></button>
+        <button class="btn btn-primary" id="openAddBtn"><i class="fa-solid fa-plus"></i> Add Product</button>
+      </div>
+    </div>
+
+    <!-- grid -->
+    <section class="grid">
+
+      <!-- stats -->
+      <div class="stat card">
+        <div class="badge"><i class="fa-solid fa-boxes-stacked"></i></div>
+        <div><h4 id="statCount">0</h4><p>Products</p></div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#34d399,#10b981)"><i class="fa-solid fa-layer-group"></i></div>
+        <div><h4 id="statStock">0</h4><p>Total stock</p></div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#f97316,#f59e0b)"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div><h4 id="statLow">0</h4><p>Low stock items</p></div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)"><i class="fa-solid fa-warehouse"></i></div>
+        <div><h4 id="statSuppliers">0</h4><p>Suppliers</p></div>
+      </div>
+
+      <!-- controls for table -->
+      <div class="card table-wrap">
+        <div class="controls-row" style="justify-content:space-between">
+          <div style="display:flex;gap:8px;">
+            <select id="categoryFilter" class="btn btn-ghost">
+              <option value="all">All categories</option>
+            </select>
+            <select id="stockFilter" class="btn btn-ghost">
+              <option value="all">All stock status</option>
+              <option value="low">Low stock</option>
+              <option value="ok">OK</option>
+            </select>
+            <button class="btn btn-ghost" id="exportExcel">Export Excel</button>
+            <button class="btn btn-ghost" id="exportPDF">Export PDF</button>
+          </div>
+          <div>
+            <input id="quickAddQty" type="number" placeholder="Quick add qty" style="padding:8px;border-radius:8px;border:1px solid #ddd" />
+            <button class="btn btn-ghost" id="quickAddBtn">Apply</button>
+          </div>
+        </div>
+
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr><th>SKU</th><th>Product</th><th>Category</th><th>Stock</th><th>Reorder</th><th>Supplier</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="productsTableBody">
+              <!-- injected -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- inventory side -->
+      <div class="inventory-side card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>Low stock</strong><button class="btn btn-ghost" onclick="viewAllLow()">View all</button>
+        </div>
+        <div id="lowList" style="margin-top:8px; display:flex; flex-direction:column; gap:10px">
+          <!-- low items -->
+        </div>
+        <hr/>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>Suppliers</strong><button class="btn btn-ghost" onclick="viewSuppliers()">Manage</button>
+        </div>
+        <div id="supplierList" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+
+    </section>
+
+    <div style="height:18px"></div>
+    <div style="text-align:center;color:var(--muted)">© 2025 FinMate — Inventory Management</div>
+
+  </main>
+</div>
+
+<!-- Modal template (hidden) -->
+<div id="modalRoot" style="display:none"></div>
+
+<!-- Firebase SDK (v9 modular) -->
+<script type="module">
+  // --- IMPORTANT: replace these with your Firebase project config ---
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, getDocs, doc, setDoc, updateDoc, deleteDoc, onSnapshot
+  } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+  import {
+    getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject
+  } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
+
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  // initialize
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+  const productsCol = collection(db, 'products');
+
+  // local cache
+  let products = [];
+
+  // helpers for DOM
+  const tbody = document.getElementById('productsTableBody');
+  const lowList = document.getElementById('lowList');
+  const supplierList = document.getElementById('supplierList');
+  const categoryFilter = document.getElementById('categoryFilter');
+  const stockFilter = document.getElementById('stockFilter');
+  const searchInput = document.getElementById('searchInput');
+
+  // ---------- Modal builder ----------
+  function openProductModal(item = null){
+    // build modal HTML
+    const modal = document.createElement('div');
+    modal.className = 'modal-backdrop';
+    modal.innerHTML = `
+      <div class="modal" role="dialog">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <strong>${item ? 'Edit Product' : 'Add Product'}</strong>
+          <button class="close-btn" id="closeModalBtn">&times;</button>
+        </div>
+        <div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <div style="flex:1;min-width:220px">
+              <label>SKU</label>
+              <input id="m_sku" class="form-input" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd" value="${item ? item.sku : ''}">
+            </div>
+            <div style="flex:2;min-width:220px">
+              <label>Product name</label>
+              <input id="m_name" class="form-input" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd" value="${item ? item.name : ''}">
+            </div>
+            <div style="flex:1;min-width:180px">
+              <label>Category</label>
+              <input id="m_cat" class="form-input" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd" value="${item ? item.category : ''}">
+            </div>
+            <div style="flex:1;min-width:140px">
+              <label>Stock</label>
+              <input id="m_stock" type="number" class="form-input" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd" value="${item ? item.stock : 0}">
+            </div>
+            <div style="flex:1;min-width:140px">
+              <label>Reorder</label>
+              <input id="m_reorder" type="number" class="form-input" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd" value="${item ? item.reorder : 10}">
+            </div>
+            <div style="flex:1;min-width:220px">
+              <label>Supplier</label>
+              <input id="m_supplier" class="form-input" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd" value="${item ? item.supplier : ''}">
+            </div>
+            <div style="flex-basis:100%">
+              <label>Image (optional)</label>
+              <input id="m_image" type="file" accept="image/*" style="width:100%">
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+            <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
+            <button class="btn btn-primary" id="saveBtn">${item ? 'Save changes' : 'Create product'}</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('closeModalBtn').onclick = () => modal.remove();
+    document.getElementById('cancelBtn').onclick = () => modal.remove();
+
+    document.getElementById('saveBtn').onclick = async () => {
+      const sku = document.getElementById('m_sku').value.trim();
+      const name = document.getElementById('m_name').value.trim();
+      const category = document.getElementById('m_cat').value.trim() || 'Uncategorized';
+      const stock = parseInt(document.getElementById('m_stock').value || '0');
+      const reorder = parseInt(document.getElementById('m_reorder').value || '10');
+      const supplier = document.getElementById('m_supplier').value.trim();
+      const imgFile = document.getElementById('m_image').files[0];
+
+      if(!name || !sku){
+        alert('Please provide SKU and product name.');
+        return;
+      }
+
+      // If editing
+      if(item && item.id){
+        const docRef = doc(db, 'products', item.id);
+        await updateDoc(docRef, { sku, name, category, stock, reorder, supplier, updatedAt: new Date() });
+        // image upload if provided
+        if(imgFile){
+          const storageRef = sRef(storage, `products/${Date.now()}_${imgFile.name}`);
+          await uploadBytes(storageRef, imgFile);
+          const url = await getDownloadURL(storageRef);
+          await updateDoc(docRef, { imageUrl: url, imagePath: storageRef.fullPath });
+        }
+      } else {
+        // create new doc
+        const newDoc = await addDoc(productsCol, { sku, name, category, stock, reorder, supplier, createdAt: new Date() });
+        // image upload
+        if(imgFile){
+          const storageRef = sRef(storage, `products/${Date.now()}_${imgFile.name}`);
+          await uploadBytes(storageRef, imgFile);
+          const url = await getDownloadURL(storageRef);
+          const docRef = doc(db, 'products', newDoc.id);
+          await updateDoc(docRef, { imageUrl: url, imagePath: storageRef.fullPath });
+        }
+      }
+
+      modal.remove();
+    };
+  }
+
+  // ---------- Render & utilities ----------
+  function buildRow(p){
+    return `
+      <tr data-id="${p.id}">
+        <td>${p.sku || ''}</td>
+        <td style="display:flex;gap:10px;align-items:center">
+          <div style="width:48px;height:48px;border-radius:8px;overflow:hidden;background:#f3f7ff;display:flex;align-items:center;justify-content:center">
+            ${p.imageUrl ? `<img src="${p.imageUrl}" style="width:100%;height:100%;object-fit:cover">` : `<i class="fa-solid fa-box" style="color:var(--blue-700)"></i>`}
+          </div>
+          <div>
+            <div style="font-weight:700">${p.name}</div>
+            <div style="color:var(--muted);font-size:.9rem">${p.description || ''}</div>
+          </div>
+        </td>
+        <td>${p.category || 'Uncategorized'}</td>
+        <td>${p.stock ?? 0}</td>
+        <td>${p.reorder ?? 10}</td>
+        <td>${p.supplier || '-'}</td>
+        <td>
+          <button class="btn btn-ghost" data-action="edit"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-ghost" data-action="delete"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      </tr>
+    `;
+  }
+
+  async function renderProducts(list){
+    tbody.innerHTML = list.map(p => buildRow(p)).join('');
+    // attach row actions
+    document.querySelectorAll('#productsTableBody tr').forEach(tr=>{
+      tr.querySelectorAll('button').forEach(btn=>{
+        btn.onclick = async (e) => {
+          const id = tr.dataset.id;
+          const action = btn.getAttribute('data-action');
+          const prod = products.find(x=>x.id === id);
+          if(action === 'edit') openProductModal(prod);
+          if(action === 'delete'){
+            if(!confirm('Delete product?')) return;
+            // delete image from storage if exists
+            if(prod.imagePath){
+              try{ await deleteObject(sRef(storage, prod.imagePath)); }catch(err){ console.warn('delete image failed', err) }
+            }
+            await deleteDoc(doc(db, 'products', id));
+          }
+        };
+      });
+    });
+    updateStats(list);
+  }
+
+  function updateStats(list){
+    const count = list.length;
+    const totalStock = list.reduce((s,i)=>s+(i.stock||0),0);
+    const low = list.filter(i=> (i.stock||0) <= (i.reorder ?? 10)).length;
+    const suppliers = [...new Set(list.map(i=>i.supplier).filter(Boolean))].length;
+    document.getElementById('statCount').textContent = count;
+    document.getElementById('statStock').textContent = totalStock.toLocaleString();
+    document.getElementById('statLow').textContent = low;
+    document.getElementById('statSuppliers').textContent = suppliers;
+    // low list & suppliers panel
+    lowList.innerHTML = list.filter(i=> (i.stock||0) <= (i.reorder ?? 10)).slice(0,5).map(i=>`
+      <div class="list-item">
+        <div class="product-thumb">${i.imageUrl ? `<img src="${i.imageUrl}" style="width:100%;height:100%;object-fit:cover">` : '<i class="fa-solid fa-box"></i>'}</div>
+        <div>
+          <div style="font-weight:700">${i.name}</div>
+          <div style="color:var(--muted);font-size:.9rem">Stock: ${i.stock||0} • Reorder: ${i.reorder||10}</div>
+        </div>
+        <div style="margin-left:auto;color:#f97316;font-weight:700">Low</div>
+      </div>
+    `).join('');
+    supplierList.innerHTML = [...new Set(list.map(i=>i.supplier).filter(Boolean))].slice(0,5).map(s=>`<div style="padding:8px;border-radius:6px;background:rgba(42,157,244,0.06)">${s}</div>`).join('');
+  }
+
+  // ---------- filters & search ----------
+  function applyFilters(){
+    let filtered = [...products];
+    const cat = categoryFilter.value;
+    const stock = stockFilter.value;
+    const q = (searchInput.value || '').trim().toLowerCase();
+
+    if(cat && cat !== 'all') filtered = filtered.filter(p => (p.category||'').toLowerCase() === cat.toLowerCase());
+    if(stock === 'low') filtered = filtered.filter(p => (p.stock||0) <= (p.reorder||10));
+    if(stock === 'ok') filtered = filtered.filter(p => (p.stock||0) > (p.reorder||10));
+    if(q) filtered = filtered.filter(p => (p.name + ' ' + (p.sku||'') + ' ' + (p.supplier||'')).toLowerCase().includes(q));
+    renderProducts(filtered);
+  }
+
+  searchInput.addEventListener('input', () => applyFilters());
+  categoryFilter.addEventListener('change', applyFilters);
+  stockFilter.addEventListener('change', applyFilters);
+
+  // quick add qty placeholder
+  document.getElementById('quickAddBtn').addEventListener('click', () => {
+    const val = parseInt(document.getElementById('quickAddQty').value || '0');
+    if(!val){ alert('Enter quantity to add'); return; }
+    alert('Quick add not wired to a particular SKU — implement selection flow.');
+  });
+
+  // export functions
+  document.getElementById('exportExcel').addEventListener('click', () => {
+    const ws = XLSX.utils.json_to_sheet(products.map(p=>({
+      sku:p.sku, name:p.name, category:p.category, stock:p.stock, reorder:p.reorder, supplier:p.supplier
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+    XLSX.writeFile(wb, 'bluefactory_inventory.xlsx');
+  });
+
+  document.getElementById('exportPDF').addEventListener('click', () => {
+    const { jsPDF } = window.jspdf;
+    const docPDF = new jsPDF({unit:'pt',format:'a4'});
+    docPDF.text('BlueFactory Inventory', 40, 40);
+    const rows = products.map(p=>[p.sku||'', p.name||'', p.category||'', p.stock||0, p.reorder||0, p.supplier||'']);
+    docPDF.autoTable({ head:[['SKU','Product','Category','Stock','Reorder','Supplier']], body:rows, startY:60 });
+    docPDF.save('inventory.pdf');
+  });
+
+  document.getElementById('openAddBtn').addEventListener('click', ()=> openProductModal());
+
+  // theme toggle
+  document.getElementById('themeToggle').addEventListener('click', ()=> {
+    const el = document.documentElement;
+    const cur = el.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    el.setAttribute('data-theme', next);
+    localStorage.setItem('bf_theme', next);
+    document.getElementById('themeToggle').innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  });
+
+  // load saved theme
+  (function(){
+    const saved = localStorage.getItem('bf_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+    document.getElementById('themeToggle').innerHTML = saved === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  })();
+
+  // ---------- Firestore listener (realtime) ----------
+  // keep local products array synced
+  onSnapshot(productsCol, (snapshot) => {
+    products = snapshot.docs.map(d => ({ id:d.id, ...d.data() }));
+    // populate category filter options
+    const cats = [...new Set(products.map(p=>p.category).filter(Boolean))];
+    categoryFilter.innerHTML = `<option value="all">All categories</option>` + cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+    applyFilters();
+  }, (err) => {
+    console.error('products snapshot error', err);
+    // If Firestore not configured, fallback to demo data
+    if(products.length===0){
+      products = [
+        { id:'demo1', sku:'LM-400', name:'Moulinex Blender LM2421EG', category:'Appliances', stock:3, reorder:10, supplier:'Moulinex', imageUrl:'' },
+        { id:'demo2', sku:'PS-001', name:'Power Supply Model A', category:'Parts', stock:7, reorder:20, supplier:'ElectroCo', imageUrl:'' },
+        { id:'demo3', sku:'GSET-200', name:'Gear Set 200', category:'Parts', stock:1, reorder:15, supplier:'GearWorks', imageUrl:'' }
+      ];
+      applyFilters();
+    }
+  });
+
+  // helper to view all low items
+  function viewAllLow(){
+    const low = products.filter(i=> (i.stock||0) <= (i.reorder||10));
+    renderProducts(low);
+  }
+  function viewSuppliers(){ alert('Open suppliers page (to implement)'); }
+
+  // navigation helpers (placeholders)
+  window.openProductModal = openProductModal;
+  window.viewAllLow = viewAllLow;
+  window.viewSuppliers = viewSuppliers;
+
+</script>
+
+</body>
+</html>
+

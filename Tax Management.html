@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Tax Management</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- XLSX for Excel export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- Firebase (compat for quick usage) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+  <style>
+    :root{
+      --blue-900: #0b3d91;
+      --blue-700: #1464c9;
+      --blue-500: #2a9df4;
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --muted: #6b7280;
+    }
+    [data-theme="dark"]{
+      --bg: #0f1724;
+      --panel: #0f1724;
+      --muted: #9ca3af;
+      --blue-900: #071733;
+      --blue-700: #0a3a6b;
+      --blue-500: #1f6fb3;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg), #e9f2ff 300px);
+      color: #0b1220;
+      transition: background .35s, color .35s;
+      min-height:100vh;
+      --sidebar-w:260px;
+    }
+    [data-theme="dark"] body{ color: #e6eef8; }
+
+    .app{ display:flex; min-height:100vh; }
+    /* Sidebar */
+    .sidebar{
+      width:var(--sidebar-w);
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color: #fff;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      position:fixed;
+      left:0; top:0; bottom:0;
+      box-shadow: 0 6px 24px rgba(10,25,60,0.12);
+      overflow:hidden;
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem; color: #fff; transform:translateY(-1px) }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y:auto; padding-right:5px; }
+    .nav-links::-webkit-scrollbar{ width:6px }
+    .nav-links::-webkit-scrollbar-thumb{ background:#0b284f; border-radius:4px }
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.95); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{ background: rgba(255,255,255,0.06); transform:translateX(6px); }
+
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+    /* Main */
+    .main{ margin-left:var(--sidebar-w); padding:22px; width:calc(100% - var(--sidebar-w)); }
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+
+    .search{ flex:1; max-width:540px; display:flex; gap:8px; align-items:center; }
+    .search input{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,0.06); background:var(--panel); box-shadow:0 2px 8px rgba(11,18,32,0.04); }
+
+    .controls{ display:flex; gap:10px; align-items:center; }
+
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; cursor:pointer; border:none; font-weight:600; }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; box-shadow: 0 8px 18px rgba(42,157,244,0.14); }
+    .btn-ghost{ background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted); }
+    .icon-btn{ background:var(--panel); padding:8px; border-radius:10px; border:1px solid rgba(15,23,42,0.05) }
+
+    .grid{ display:grid; grid-template-columns: repeat(12, 1fr); gap:18px; align-items:start; }
+    .card{ background:var(--panel); border-radius:12px; padding:16px; box-shadow: 0 6px 20px rgba(16,24,40,0.04); transition: transform .28s, box-shadow .28s; overflow:hidden; }
+    .card:hover{ transform: translateY(-6px); box-shadow: 0 16px 36px rgba(16,24,40,0.08); }
+
+    .heading-row{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; }
+    h2{ margin:0; font-size:1.25rem; }
+
+    /* left column layout */
+    .left-col{ grid-column: span 7; }
+    .right-col{ grid-column: span 5; }
+
+    .form-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    label{ font-weight:600; display:block; margin-bottom:6px; }
+    input[type="text"], input[type="number"], select { padding:8px 10px; border-radius:8px; border:1px solid #ddd; width:100%; background:#fff; }
+    input[type="checkbox"] { transform:scale(1.1); }
+
+    table{ width:100%; border-collapse:collapse; font-size:.95rem; }
+    thead th{ text-align:left; color:var(--muted); font-weight:700; padding:10px 6px; font-size:.86rem; }
+    tbody tr{ transition: background .18s, transform .18s; border-bottom:1px solid rgba(0,0,0,0.04); }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform: translateX(4px); }
+    td{ padding:12px 6px; vertical-align:middle; }
+
+    .small-muted{ color:var(--muted); font-size:.92rem; }
+
+    /* responsive */
+    @media (max-width:1000px){
+      .left-col{ grid-column: span 12; } .right-col{ grid-column: span 12; }
+    }
+
+    /* animations */
+    @keyframes popIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+    .card{ animation: popIn .45s ease both }
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>BlueFactory</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers</a>
+      <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts</a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries</a>
+      <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+      <a href="Tax Management.html" class="nav-link active"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency</a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications</a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-circle-info"></i></div>
+        <div>
+          <div style="font-weight:700">Factory #12</div>
+          <div style="font-size:.85rem;opacity:.9">Plan: Enterprise</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main" role="main">
+
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2>Tax Management</h2>
+        <div class="small-muted">Create, edit & apply tax rules (VAT, Income, Customs, etc.)</div>
+      </div>
+
+      <div class="controls">
+        <div class="search">
+          <input id="globalSearch" placeholder="Search taxes by name or type..." />
+        </div>
+        <button class="btn icon-btn" title="Notifications"><i class="fa-regular fa-bell"></i></button>
+        <button class="btn icon-btn" id="themeToggle" title="Toggle theme"><i class="fa-regular fa-moon"></i></button>
+        <button class="btn btn-primary" id="openAddBtn"><i class="fa-solid fa-plus"></i> New Tax</button>
+      </div>
+    </div>
+
+    <section class="grid">
+
+      <!-- Left column: Taxes list & form -->
+      <div class="left-col card">
+        <div class="heading-row">
+          <div>
+            <strong>Taxes</strong>
+            <div class="small-muted">Manage tax rates & rules stored in Firestore</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost" onclick="exportTaxesExcel()">Export Excel</button>
+            <button class="btn btn-ghost" onclick="exportTaxesPDF()">Export PDF</button>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div style="display:flex;gap:12px;margin-bottom:12px">
+          <select id="filterType" style="width:200px;padding:8px;border-radius:8px;border:1px solid #ddd">
+            <option value="">All types</option>
+            <option value="VAT">VAT</option>
+            <option value="Income">Income</option>
+            <option value="Customs">Customs</option>
+            <option value="Other">Other</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:6px;color:var(--muted)">
+            <input type="checkbox" id="filterActive" checked /> Show only active
+          </label>
+        </div>
+
+        <!-- Taxes table -->
+        <div style="overflow:auto; max-height:420px">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Type</th><th>Rate (%)</th><th>Applies To</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="taxTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Right column: Add/Edit & Demo -->
+      <div class="right-col card">
+        <div>
+          <strong id="formTitle">Add New Tax</strong>
+          <div class="small-muted">Define tax rule and how it applies</div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div class="form-row" style="margin-bottom:10px">
+            <div style="flex:1">
+              <label for="taxName">Tax Name</label>
+              <input id="taxName" type="text" placeholder="VAT 14%" />
+            </div>
+            <div style="width:140px">
+              <label for="taxType">Type</label>
+              <select id="taxType">
+                <option value="VAT">VAT</option>
+                <option value="Income">Income</option>
+                <option value="Customs">Customs</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-bottom:10px">
+            <div style="width:160px">
+              <label for="taxRate">Rate (%)</label>
+              <input id="taxRate" type="number" min="0" step="0.01" value="14" />
+            </div>
+            <div style="flex:1">
+              <label for="appliesTo">Applies To</label>
+              <select id="appliesTo">
+                <option value="invoice">Invoice Total</option>
+                <option value="product_price">Product Price</option>
+                <option value="shipping">Shipping</option>
+              </select>
+            </div>
+            <div style="width:120px;display:flex;flex-direction:column;justify-content:flex-end">
+              <label>&nbsp;</label>
+              <label style="display:flex;align-items:center;gap:8px">
+                <input id="taxActive" type="checkbox" checked /> Active
+              </label>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-primary" id="saveTaxBtn">Save Tax</button>
+            <button class="btn btn-ghost" id="resetFormBtn">Reset</button>
+          </div>
+        </div>
+
+        <hr style="margin:18px 0" />
+
+        <!-- Demo calculator -->
+        <div>
+          <strong>Invoice Tax Calculator (Demo)</strong>
+          <div class="small-muted">Pick a tax and compute automatically</div>
+
+          <div style="margin-top:12px">
+            <label>Subtotal</label>
+            <input id="invoiceSubtotal" type="number" min="0" step="0.01" value="1000" />
+          </div>
+
+          <div style="margin-top:12px">
+            <label>Select Tax</label>
+            <select id="taxSelect">
+              <option value="">-- pick a tax --</option>
+            </select>
+          </div>
+
+          <div style="margin-top:12px;display:flex;gap:12px;align-items:center">
+            <div>
+              <div class="small-muted">Tax Amount</div>
+              <div id="taxAmount" style="font-weight:700">$0.00</div>
+            </div>
+            <div>
+              <div class="small-muted">Total</div>
+              <div id="invoiceTotal" style="font-weight:700">$0.00</div>
+            </div>
+            <div style="margin-left:auto">
+              <button class="btn btn-ghost" onclick="applyTaxDemo()">Calculate</button>
+              <button class="btn btn-ghost" onclick="clearTaxDemo()">Clear</button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <div style="margin-top:18px" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <strong>Activity</strong>
+          <div class="small-muted">Recent changes & logs (local demo)</div>
+        </div>
+        <div class="small-muted" id="lastSync">Not synced yet</div>
+      </div>
+      <div style="margin-top:12px">
+        <ul id="activityLog" style="margin:0;padding-left:18px;"></ul>
+      </div>
+    </div>
+
+    <div style="margin-top:12px" class="page-footer small-muted">© 2025 BlueFactory — Accounting for Manufacturers</div>
+
+  </main>
+</div>
+
+<script>
+/* ===========================
+   Firebase config (replace)
+   =========================== */
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  // ... other config
+};
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* ===========================
+   Theme handling
+   =========================== */
+(function(){
+  const saved = localStorage.getItem('bf_theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+  document.getElementById('themeToggle').innerHTML = saved === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+})();
+document.getElementById('themeToggle').addEventListener('click', function(){
+  const dt = document.documentElement;
+  const cur = dt.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const nxt = cur === 'dark' ? 'light' : 'dark';
+  dt.setAttribute('data-theme', nxt);
+  localStorage.setItem('bf_theme', nxt);
+  this.innerHTML = nxt === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+});
+
+/* ===========================
+   DOM refs
+   =========================== */
+const taxTableBody = document.getElementById('taxTableBody');
+const taxSelect = document.getElementById('taxSelect');
+const openAddBtn = document.getElementById('openAddBtn');
+const saveTaxBtn = document.getElementById('saveTaxBtn');
+const resetFormBtn = document.getElementById('resetFormBtn');
+const activityLog = document.getElementById('activityLog');
+const lastSync = document.getElementById('lastSync');
+
+let editingId = null; // when editing an existing tax
+
+/* ===========================
+   Local helpers (UI)
+   =========================== */
+function logActivity(text){
+  const li = document.createElement('li');
+  li.textContent = `${new Date().toLocaleString()}: ${text}`;
+  activityLog.prepend(li);
+  lastSync.textContent = 'Last change: ' + new Date().toLocaleTimeString();
+}
+
+/* ===========================
+   Firestore CRUD for taxes
+   =========================== */
+async function loadTaxes(){
+  // load taxes collection
+  try {
+    const snapshot = await db.collection('taxes').orderBy('name').get();
+    const taxes = [];
+    snapshot.forEach(doc => taxes.push({ id: doc.id, ...doc.data() }));
+    renderTaxTable(taxes);
+    populateTaxSelect(taxes);
+    logActivity('Taxes loaded from Firestore (' + taxes.length + ')');
+  } catch (err) {
+    console.error('Error loading taxes:', err);
+    logActivity('Error loading taxes (see console)');
+  }
+}
+
+function renderTaxTable(taxes){
+  taxTableBody.innerHTML = '';
+  const activeOnly = document.getElementById('filterActive').checked;
+  const typeFilter = document.getElementById('filterType').value.toLowerCase();
+  const q = document.getElementById('globalSearch').value.trim().toLowerCase();
+
+  taxes.filter(t => {
+    if(activeOnly && !t.active) return false;
+    if(typeFilter && t.type.toLowerCase() !== typeFilter) return false;
+    if(q){
+      return [t.name, t.type, t.appliesTo].join(' ').toLowerCase().includes(q);
+    }
+    return true;
+  }).forEach(t => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(t.name)}</td>
+      <td>${escapeHtml(t.type)}</td>
+      <td>${Number(t.rate).toFixed(2)}</td>
+      <td>${escapeHtml(t.appliesTo)}</td>
+      <td>${t.active ? '<span style="color:#059669;font-weight:700">Active</span>' : '<span style="color:#9ca3af">Inactive</span>'}</td>
+      <td>
+        <button class="btn btn-ghost" onclick='editTax("${t.id}")'><i class="fa-solid fa-pen"></i></button>
+        <button class="btn btn-ghost" onclick='toggleTaxActive("${t.id}", ${t.active})'>${t.active ? '<i class="fa-solid fa-toggle-on"></i>' : '<i class="fa-solid fa-toggle-off"></i>'}</button>
+        <button class="btn btn-ghost" onclick='deleteTax("${t.id}")'><i class="fa-solid fa-trash"></i></button>
+      </td>
+    `;
+    taxTableBody.appendChild(tr);
+  });
+}
+
+function populateTaxSelect(taxes){
+  // refresh tax pick dropdown used in demo calculator
+  taxSelect.innerHTML = '<option value="">-- pick a tax --</option>';
+  taxes.filter(t => t.active).forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = JSON.stringify({ id: t.id, rate: Number(t.rate), name: t.name, appliesTo: t.appliesTo });
+    opt.textContent = `${t.name} — ${t.rate}% (${t.type})`;
+    taxSelect.appendChild(opt);
+  });
+}
+
+/* Add / Update tax */
+saveTaxBtn.addEventListener('click', async () => {
+  const name = document.getElementById('taxName').value.trim();
+  const type = document.getElementById('taxType').value;
+  const rate = parseFloat(document.getElementById('taxRate').value) || 0;
+  const appliesTo = document.getElementById('appliesTo').value;
+  const active = !!document.getElementById('taxActive').checked;
+
+  if(!name){ alert('Please enter tax name'); return; }
+
+  const payload = { name, type, rate, appliesTo, active, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+
+  try {
+    if(editingId){
+      await db.collection('taxes').doc(editingId).update(payload);
+      logActivity(`Updated tax "${name}"`);
+      editingId = null;
+    } else {
+      payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('taxes').add(payload);
+      logActivity(`Added tax "${name}"`);
+    }
+    resetForm();
+    await loadTaxes();
+  } catch (err) {
+    console.error(err);
+    alert('Error saving tax, see console');
+  }
+});
+
+resetFormBtn.addEventListener('click', resetForm);
+
+function resetForm(){
+  document.getElementById('taxName').value = '';
+  document.getElementById('taxType').value = 'VAT';
+  document.getElementById('taxRate').value = 14;
+  document.getElementById('appliesTo').value = 'invoice';
+  document.getElementById('taxActive').checked = true;
+  editingId = null;
+  document.getElementById('formTitle').textContent = 'Add New Tax';
+}
+
+/* Edit */
+async function editTax(id){
+  try {
+    const doc = await db.collection('taxes').doc(id).get();
+    if(!doc.exists){ alert('Tax not found'); return; }
+    const t = doc.data();
+    document.getElementById('taxName').value = t.name || '';
+    document.getElementById('taxType').value = t.type || 'VAT';
+    document.getElementById('taxRate').value = Number(t.rate) || 0;
+    document.getElementById('appliesTo').value = t.appliesTo || 'invoice';
+    document.getElementById('taxActive').checked = !!t.active;
+    editingId = id;
+    document.getElementById('formTitle').textContent = 'Edit Tax';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+/* Toggle active */
+async function toggleTaxActive(id, current){
+  try {
+    await db.collection('taxes').doc(id).update({ active: !current, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    logActivity('Toggled tax active state');
+    await loadTaxes();
+  } catch (err) { console.error(err); }
+}
+
+/* Delete */
+async function deleteTax(id){
+  if(!confirm('Delete this tax?')) return;
+  try {
+    await db.collection('taxes').doc(id).delete();
+    logActivity('Deleted a tax');
+    await loadTaxes();
+  } catch (err){ console.error(err); alert('Error deleting tax (see console)'); }
+}
+
+/* ===========================
+   Demo: Invoice tax calculator
+   =========================== */
+function applyTaxDemo(){
+  const subtotal = parseFloat(document.getElementById('invoiceSubtotal').value) || 0;
+  const selected = document.getElementById('taxSelect').value;
+  if(!selected){ alert('Pick a tax first'); return; }
+  const taxObj = JSON.parse(selected);
+  // simple percent application
+  const taxAmount = +(subtotal * (taxObj.rate / 100));
+  const total = +(subtotal + taxAmount);
+  document.getElementById('taxAmount').textContent = '$' + taxAmount.toFixed(2);
+  document.getElementById('invoiceTotal').textContent = '$' + total.toFixed(2);
+}
+
+function clearTaxDemo(){
+  document.getElementById('invoiceSubtotal').value = '';
+  document.getElementById('taxSelect').value = '';
+  document.getElementById('taxAmount').textContent = '$0.00';
+  document.getElementById('invoiceTotal').textContent = '$0.00';
+}
+
+/* ===========================
+   Export: Excel & PDF
+   =========================== */
+function exportTaxesExcel(){
+  (async ()=>{
+    try {
+      const snapshot = await db.collection('taxes').orderBy('name').get();
+      const arr = [];
+      snapshot.forEach(doc => {
+        const d = doc.data(); arr.push({ id: doc.id, name: d.name, type: d.type, rate: d.rate, appliesTo: d.appliesTo, active: d.active ? 'Yes':'No' });
+      });
+      const ws = XLSX.utils.json_to_sheet(arr);
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Taxes');
+      XLSX.writeFile(wb, 'taxes.xlsx');
+      logActivity('Exported taxes to Excel');
+    } catch (err) { console.error(err); alert('Export failed'); }
+  })();
+}
+
+async function exportTaxesPDF(){
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    doc.setFontSize(14);
+    doc.text('Taxes Report — BlueFactory', 14, 16);
+    doc.setFontSize(10);
+    let y = 26;
+    const snapshot = await db.collection('taxes').orderBy('name').get();
+    doc.text('Name', 14, y); doc.text('Type', 70, y); doc.text('Rate', 120, y); doc.text('Active', 150, y);
+    y += 6;
+    snapshot.forEach(docSnap => {
+      const d = docSnap.data();
+      if(y > 280){ doc.addPage(); y = 20; }
+      doc.text(String(d.name || ''), 14, y);
+      doc.text(String(d.type || ''), 70, y);
+      doc.text(String(Number(d.rate || 0).toFixed(2)) + '%', 120, y);
+      doc.text(d.active ? 'Yes' : 'No', 150, y);
+      y += 6;
+    });
+    doc.save('taxes.pdf');
+    logActivity('Exported taxes to PDF');
+  } catch (err) { console.error(err); alert('PDF export failed'); }
+}
+
+/* ===========================
+   UI interactions & filters
+   =========================== */
+document.getElementById('filterType').addEventListener('change', () => loadTaxes());
+document.getElementById('filterActive').addEventListener('change', () => loadTaxes());
+document.getElementById('globalSearch').addEventListener('input', () => loadTaxes());
+
+/* ===========================
+   Utility helpers
+   =========================== */
+function escapeHtml(str){
+  if(!str) return '';
+  return String(str).replace(/[&<>"'`=\/]/g, s => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;","/":"&#x2F;","`":"&#x60;","=":"&#x3D;" })[s]);
+}
+
+/* ===========================
+   Initial load & real-time listener
+   =========================== */
+loadTaxes();
+
+// Optional: real-time updates (uncomment to use real-time instead of one-shot load)
+// db.collection('taxes').onSnapshot(snapshot => {
+//   const taxes = [];
+//   snapshot.forEach(doc => taxes.push({ id: doc.id, ...doc.data() }));
+//   renderTaxTable(taxes);
+//   populateTaxSelect(taxes);
+//   logActivity('Taxes updated (realtime)');
+// });
+
+</script>
+</body>
+</html>

@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Notifications Center</title>
+
+  <!-- Font Awesome + Chart.js -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --blue-900:#0b3d91; --blue-700:#1464c9; --blue-500:#2a9df4;
+      --bg:#f4f7fb; --panel:#fff; --muted:#6b7280;
+    }
+    [data-theme="dark"]{ --bg:#0f1724; --panel:#111827; --muted:#9ca3af; --blue-700:#0a3a6b; }
+
+    *{box-sizing:border-box}
+    body{ margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial; background:linear-gradient(180deg,var(--bg), #e9f2ff 300px); color:#0b1220; transition:.25s; }
+
+    .app{ display:flex; min-height:100vh; }
+    /* Sidebar (BlueFactory style) */
+    .sidebar{ width:260px; background:linear-gradient(180deg,var(--blue-900),var(--blue-700)); color:#fff; padding:18px; display:flex; flex-direction:column; gap:18px; position:fixed; left:0; top:0; bottom:0; }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+    .main{ margin-left:260px; padding:24px; width:calc(100% - 260px); }
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+    .search{ flex:1; max-width:540px; display:flex; gap:8px; align-items:center; }
+    .search input{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,0.06); background:var(--panel) }
+    .controls{ display:flex; gap:10px; align-items:center; }
+
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; cursor:pointer; border:none; font-weight:600; }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; }
+    .btn-ghost{ background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted); padding:8px 10px; border-radius:10px }
+
+    .grid{ display:grid; grid-template-columns: repeat(12,1fr); gap:18px; align-items:start; }
+
+    .card{ background:var(--panel); border-radius:12px; padding:16px; box-shadow:0 6px 20px rgba(16,24,40,0.04); transition:transform .28s; overflow:hidden; }
+    .card:hover{ transform:translateY(-6px); box-shadow:0 16px 36px rgba(16,24,40,0.08); }
+
+    .stat{ grid-column:span 3; display:flex; gap:12px; align-items:center; }
+    .badge{ width:54px; height:54px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,var(--blue-500),var(--blue-700)); color:#fff; font-size:1.25rem; }
+    .stat h4{ margin:0; font-size:1.05rem } .stat p{ margin:0; color:var(--muted); font-size:.9rem }
+
+    .notifications{ grid-column: span 8; min-height:360px; display:flex; flex-direction:column; gap:12px; }
+    .analytics{ grid-column: span 4; min-height:360px; }
+
+    .list{ display:flex; flex-direction:column; gap:10px; max-height:520px; overflow:auto; padding-right:6px; }
+    .note{ display:flex; gap:12px; padding:12px; border-radius:10px; align-items:flex-start; background:linear-gradient(180deg, rgba(10,25,60,0.02), rgba(10,25,60,0.01)); transition:all .18s; border:1px solid rgba(0,0,0,0.03) }
+    .note.unread{ box-shadow: 0 8px 20px rgba(42,157,244,0.06); background:linear-gradient(90deg,#eef7ff,#fff); }
+    .note:hover{ transform:translateX(4px) }
+    .note .icon{ width:48px; height:48px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--blue-700); background:#eef7ff; font-size:1.1rem; }
+    .note .body{ flex:1 }
+    .note .meta{ color:var(--muted); font-size:.85rem; margin-top:6px }
+
+    .filters{ display:flex; gap:8px; flex-wrap:wrap; align-items:center }
+    .tag{ padding:6px 10px; border-radius:999px; background:#f1f5f9; color:var(--muted); font-weight:700; }
+
+    .table-wrap{ overflow:auto; }
+
+    .timeline{ display:flex; flex-direction:column; gap:12px; max-height:320px; overflow:auto; padding-right:6px; }
+
+    .settings{ margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+
+    .page-footer{ text-align:center; padding:22px 0; color:var(--muted); margin-top:16px }
+
+    @media (max-width:1100px){
+      .main{ margin-left:72px; width:calc(100% - 72px) } .sidebar{ width:72px } .brand span{ display:none }
+      .stat{ grid-column:span 6 } .notifications{ grid-column:span 12 } .analytics{ grid-column:span 12 }
+    }
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="app">
+   <!-- SIDEBAR -->
+   <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+      <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+      <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+      <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+    
+
+    <div class="sidebar-footer">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-circle-info"></i></div>
+        <div>
+          <div style="font-weight:700">Factory #12</div>
+          <div style="font-size:.85rem;opacity:.9">Plan: Enterprise</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2 style="margin:0">Notifications Center</h2>
+        <div style="color:var(--muted); font-size:.95rem">Real-time alerts, messages & system events</div>
+      </div>
+
+      <div class="controls">
+        <div class="search"><input id="globalSearch" placeholder="Search notifications by text, channel, user..." /></div>
+        <button class="btn icon-btn" id="themeToggle" title="Toggle theme"><i class="fa-regular fa-moon"></i></button>
+        <button class="btn btn-primary" id="composeBtn"><i class="fa-solid fa-plus"></i> New Notification</button>
+      </div>
+    </div>
+
+    <section class="grid">
+      <!-- stats -->
+      <div class="stat card"><div class="badge"><i class="fa-solid fa-bell"></i></div><div><h4 id="totalN">--</h4><p>Total Notifications</p></div></div>
+      <div class="stat card"><div class="badge" style="background:linear-gradient(135deg,#f97316,#f59e0b)"><i class="fa-solid fa-envelope-open-text"></i></div><div><h4 id="unreadN">--</h4><p>Unread</p></div></div>
+      <div class="stat card"><div class="badge" style="background:linear-gradient(135deg,#34d399,#10b981)"><i class="fa-solid fa-calendar-day"></i></div><div><h4 id="todayN">--</h4><p>Today</p></div></div>
+      <div class="stat card"><div class="badge" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)"><i class="fa-solid fa-chart-pie"></i></div><div><h4 id="avgN">--</h4><p>Avg/day (7d)</p></div></div>
+
+      <!-- notifications list -->
+      <div class="notifications card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>Notifications</strong>
+            <div class="muted small">Live feed — click an item to expand</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="filterChannel" class="btn btn-ghost">
+              <option value="all">All channels</option>
+              <option value="system">System</option>
+              <option value="orders">Orders</option>
+              <option value="payments">Payments</option>
+              <option value="inventory">Inventory</option>
+              <option value="custom">Custom</option>
+            </select>
+            <select id="filterSeverity" class="btn btn-ghost">
+              <option value="all">All severities</option>
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="critical">Critical</option>
+            </select>
+            <button class="btn btn-ghost" id="markAllRead">Mark all read</button>
+            <button class="btn btn-ghost" id="bulkDelete">Delete selected</button>
+          </div>
+        </div>
+
+        <div class="list" id="notesList">
+          <!-- populated by JS -->
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+          <div class="muted small" id="listMeta">--</div>
+          <div>
+            <button class="btn btn-ghost" id="prevPage">Prev</button>
+            <button class="btn btn-ghost" id="nextPage">Next</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- analytics & timeline -->
+      <div class="analytics card">
+        <strong>Analytics</strong>
+        <div class="muted small">Distribution by channel and severity</div>
+
+        <canvas id="channelChart" style="margin-top:12px; max-height:200px"></canvas>
+        <canvas id="severityChart" style="margin-top:12px; max-height:200px"></canvas>
+
+        <hr />
+
+        <strong>Recent Activity</strong>
+        <div class="timeline" id="timeline">
+          <!-- timeline items -->
+        </div>
+
+        <hr />
+
+        <strong>Settings</strong>
+        <div class="settings">
+          <label><input type="checkbox" id="ch-system" checked /> System messages</label>
+          <label><input type="checkbox" id="ch-orders" checked /> Orders channel</label>
+          <label><input type="checkbox" id="ch-payments" checked /> Payments channel</label>
+          <label><input type="checkbox" id="ch-inventory" checked /> Inventory channel</label>
+        </div>
+      </div>
+
+    </section>
+
+    <div class="page-footer">© 2025 BlueFactory — Notifications</div>
+  </main>
+</div>
+
+<!-- Compose Modal (simple) -->
+<div id="composeModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);z-index:60">
+  <div style="width:820px;max-width:95%;background:var(--panel);padding:18px;border-radius:12px">
+    <h3 style="margin:0 0 8px">New Notification</h3>
+    <form id="composeForm">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="nTitle" placeholder="Title" class="form-control" required />
+        <select id="nChannel" class="form-control">
+          <option value="system">System</option>
+          <option value="orders">Orders</option>
+          <option value="payments">Payments</option>
+          <option value="inventory">Inventory</option>
+          <option value="custom">Custom</option>
+        </select>
+        <select id="nSeverity" class="form-control">
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="critical">Critical</option>
+        </select>
+      </div>
+      <textarea id="nBody" class="form-control" rows="5" placeholder="Message body..."></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+        <button type="button" class="btn btn-ghost" id="closeCompose">Cancel</button>
+        <button class="btn btn-primary" type="submit">Send</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Firebase v9 modular -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, doc, getDocs, onSnapshot, updateDoc, deleteDoc, query, orderBy, limit, startAfter } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+  // <-- REPLACE with your Firebase config
+  const firebaseConfig = {
+    apiKey: "REPLACE_ME",
+    authDomain: "REPLACE_ME",
+    projectId: "REPLACE_ME",
+    storageBucket: "REPLACE_ME",
+    messagingSenderId: "REPLACE_ME",
+    appId: "REPLACE_ME"
+  };
+  // -------------------------
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const notesCol = collection(db, "notifications");
+
+  // UI refs
+  const notesList = document.getElementById('notesList');
+  const totalN = document.getElementById('totalN');
+  const unreadN = document.getElementById('unreadN');
+  const todayN = document.getElementById('todayN');
+  const avgN = document.getElementById('avgN');
+  const filterChannel = document.getElementById('filterChannel');
+  const filterSeverity = document.getElementById('filterSeverity');
+  const globalSearch = document.getElementById('globalSearch');
+  const timeline = document.getElementById('timeline');
+
+  // Charts
+  const chCtx = document.getElementById('channelChart').getContext('2d');
+  const sevCtx = document.getElementById('severityChart').getContext('2d');
+  let channelChart, severityChart;
+
+  // Compose modal controls
+  const composeModal = document.getElementById('composeModal');
+  const composeBtn = document.getElementById('composeBtn');
+  const closeCompose = document.getElementById('closeCompose');
+  const composeForm = document.getElementById('composeForm');
+
+  // Pagination state (simple)
+  let pageSize = 15;
+  let lastDoc = null;
+  let currentPage = 0;
+  let lastSnapshot = null;
+
+  // Local cache
+  let notes = []; // will hold documents { id, title, body, channel, severity, read, createdAt, meta }
+
+  // Utility helpers
+  function formatDate(ts){ return ts ? new Date(ts).toLocaleString() : '-' }
+  function nowMs(){ return Date.now() }
+  function fmt(n){ return n.toLocaleString(); }
+
+  // Render functions
+  function renderList(list){
+    notesList.innerHTML = '';
+    list.forEach(n=>{
+      const node = document.createElement('div');
+      node.className = `note ${n.read ? '' : 'unread'}`;
+      node.innerHTML = `
+        <div class="icon">${n.severity === 'critical' ? '<i class="fa-solid fa-triangle-exclamation"></i>' : (n.severity === 'warning' ? '<i class="fa-solid fa-exclamation"></i>' : '<i class="fa-solid fa-bell"></i>')}</div>
+        <div class="body">
+          <div style="display:flex;gap:10px;align-items:center">
+            <strong>${n.title}</strong>
+            <div class="tag small muted">${n.channel}</div>
+            <div style="margin-left:auto" class="muted small">${formatDate(n.createdAt)}</div>
+          </div>
+          <div class="muted meta">${n.body}</div>
+          <div style="margin-top:8px;display:flex;gap:8px">
+            <label><input type="checkbox" class="selectBox" data-id="${n.id}"> Select</label>
+            <button class="btn btn-ghost btn-sm" data-id="${n.id}" data-act="toggle">${n.read ? 'Mark unread' : 'Mark read'}</button>
+            <button class="btn btn-ghost btn-sm" data-id="${n.id}" data-act="delete">Delete</button>
+          </div>
+        </div>
+      `;
+      notesList.appendChild(node);
+    });
+    document.getElementById('listMeta').textContent = `${list.length} shown — ${notes.length} total`;
+  }
+
+  function renderStats(){
+    totalN.textContent = notes.length;
+    unreadN.textContent = notes.filter(n=>!n.read).length;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todayCount = notes.filter(n=> n.createdAt >= today.getTime()).length;
+    todayN.textContent = todayCount;
+    // avg per day (7 days)
+    const weekAgo = Date.now() - (7*24*3600*1000);
+    const last7 = notes.filter(n => n.createdAt >= weekAgo).length;
+    avgN.textContent = (last7/7).toFixed(2);
+  }
+
+  function renderCharts(){
+    const channelCounts = {};
+    const severityCounts = { info:0, warning:0, critical:0 };
+    notes.forEach(n=>{
+      channelCounts[n.channel] = (channelCounts[n.channel] || 0) + 1;
+      severityCounts[n.severity] = (severityCounts[n.severity] || 0) + 1;
+    });
+    // Channel chart
+    const labels = Object.keys(channelCounts);
+    const data = Object.values(channelCounts);
+    if(channelChart) channelChart.destroy();
+    channelChart = new Chart(chCtx, {
+      type:'pie',
+      data:{ labels, datasets:[{ data, backgroundColor: ['#2a9df4','#17a2b8','#34d399','#f59e0b','#7c3aed'] }] },
+      options:{ plugins:{ legend:{ position:'bottom' } } }
+    });
+    // Severity chart
+    const sLabels = ['info','warning','critical'];
+    const sData = sLabels.map(l => severityCounts[l] || 0);
+    if(severityChart) severityChart.destroy();
+    severityChart = new Chart(sevCtx, {
+      type:'doughnut',
+      data:{ labels:sLabels, datasets:[{ data:sData, backgroundColor:['#2a9df4','#f59e0b','#ef4444'] }] },
+      options:{ plugins:{ legend:{ position:'bottom' } } }
+    });
+  }
+
+  function renderTimeline(){
+    timeline.innerHTML = '';
+    const recent = [...notes].sort((a,b)=>b.createdAt - a.createdAt).slice(0,8);
+    recent.forEach(n=>{
+      const div = document.createElement('div');
+      div.innerHTML = `<div style="font-weight:700">${n.title}</div><div class="muted small">${n.channel} • ${formatDate(n.createdAt)}</div>`;
+      timeline.appendChild(div);
+    });
+  }
+
+  // Apply filters and search
+  function applyFilters(){
+    const ch = filterChannel.value;
+    const sev = filterSeverity.value;
+    const q = (globalSearch.value || '').trim().toLowerCase();
+    let filtered = notes.slice();
+    if(ch !== 'all') filtered = filtered.filter(n => n.channel === ch);
+    if(sev !== 'all') filtered = filtered.filter(n => n.severity === sev);
+    if(q) filtered = filtered.filter(n => (n.title + ' ' + n.body + ' ' + n.channel).toLowerCase().includes(q));
+    // pagination (simple)
+    return filtered;
+  }
+
+  // Firestore real-time snapshot
+  onSnapshot(notesCol, snapshot => {
+    const arr = [];
+    snapshot.forEach(d => arr.push({ id:d.id, ...d.data() }));
+    notes = arr.sort((a,b)=> b.createdAt - a.createdAt);
+    updateUI();
+  });
+
+  // UI update helper
+  function updateUI(){
+    const list = applyFilters();
+    renderList(list);
+    renderStats();
+    renderCharts();
+    renderTimeline();
+  }
+
+  // Compose modal handlers
+  composeBtn.addEventListener('click', ()=> composeModal.style.display = 'flex');
+  closeCompose.addEventListener('click', ()=> composeModal.style.display = 'none');
+  composeForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const title = document.getElementById('nTitle').value.trim();
+    const body = document.getElementById('nBody').value.trim();
+    const channel = document.getElementById('nChannel').value;
+    const severity = document.getElementById('nSeverity').value;
+    if(!title) return alert('Title required');
+    // Save to Firestore
+    try{
+      await addDoc(notesCol, { title, body, channel, severity, read:false, createdAt: Date.now() });
+      composeModal.style.display = 'none';
+      composeForm.reset();
+    }catch(err){ console.error(err); alert('Failed to create'); }
+  });
+
+  // Delegated buttons in list
+  notesList.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const id = btn.dataset.id;
+    const act = btn.dataset.act;
+    if(!id || !act) return;
+    if(act === 'toggle'){
+      const docRef = doc(db, 'notifications', id);
+      const note = notes.find(n=>n.id===id);
+      await updateDoc(docRef, { read: !note.read });
+    } else if(act === 'delete'){
+      if(confirm('Delete this notification?')) await deleteDoc(doc(db,'notifications', id));
+    }
+  });
+
+  // Bulk actions
+  document.getElementById('markAllRead').addEventListener('click', async ()=>{
+    if(!confirm('Mark ALL notifications as read?')) return;
+    // iterate and update each (small-scale). For large collections use Cloud Function or batched writes.
+    const updates = notes.filter(n=>!n.read).map(n => updateDoc(doc(db,'notifications', n.id), { read:true }));
+    await Promise.all(updates);
+    alert('All marked read');
+  });
+
+  document.getElementById('bulkDelete').addEventListener('click', async ()=>{
+    const checks = Array.from(document.querySelectorAll('.selectBox:checked')).map(cb => cb.dataset.id);
+    if(checks.length === 0) return alert('No items selected');
+    if(!confirm(`Delete ${checks.length} notifications?`)) return;
+    const deletes = checks.map(id => deleteDoc(doc(db,'notifications', id)));
+    await Promise.all(deletes);
+    alert('Deleted selected');
+  });
+
+  // Pagination controls (local)
+  document.getElementById('prevPage').addEventListener('click', ()=>{ /* placeholder if needed */ alert('Prev page (not implemented)') });
+  document.getElementById('nextPage').addEventListener('click', ()=>{ alert('Next page (not implemented)') });
+
+  // Filters / search hooks
+  filterChannel.addEventListener('change', updateUI);
+  filterSeverity.addEventListener('change', updateUI);
+  globalSearch.addEventListener('input', ()=> setTimeout(updateUI, 100));
+
+  // Export CSV: export currently filtered list
+  function exportCSV(){
+    const list = applyFilters();
+    const rows = [['Title','Body','Channel','Severity','Read','CreatedAt']];
+    list.forEach(n => rows.push([n.title, n.body, n.channel, n.severity, n.read, n.createdAt]));
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type:'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'notifications.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Seed sample notifications if empty (dev convenience)
+  (async function seedIfEmpty(){
+    const snap = await getDocs(notesCol);
+    if(snap.empty){
+      const sample = [
+        { title:'Daily backup completed', body:'System: server backup finished successfully', channel:'system', severity:'info', read:false, createdAt: Date.now() - 3600*1000*2 },
+        { title:'New sales order #SO-1023', body:'Order placed by Acme Co. Total $2,400', channel:'orders', severity:'info', read:false, createdAt: Date.now() - 3600*1000*6 },
+        { title:'Payment failed for INV-1008', body:'Credit card declined — retry recommended', channel:'payments', severity:'warning', read:false, createdAt: Date.now() - 3600*1000*14 },
+        { title:'Stock critical: Part 200-XL', body:'Only 2 items left', channel:'inventory', severity:'critical', read:false, createdAt: Date.now() - 3600*1000*20 },
+        { title:'Exchange rate updated', body:'EGP rate updated to 30.5', channel:'system', severity:'info', read:true, createdAt: Date.now() - 3600*1000*30 }
+      ];
+      for(const s of sample) await addDoc(notesCol, s);
+    }
+  })();
+
+  // Theme toggle persistence
+  document.getElementById('themeToggle').addEventListener('click', ()=>{
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('bf_theme', next);
+    document.getElementById('themeToggle').innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  });
+  (function(){ const s = localStorage.getItem('bf_theme') || 'light'; document.documentElement.setAttribute('data-theme', s); })();
+
+  // Optional: quick client-side notification (toast)
+  function toast(msg){ const t = document.createElement('div'); t.style.position='fixed'; t.style.right='18px'; t.style.bottom='18px'; t.style.background='#111827'; t.style.color='#fff'; t.style.padding='10px 14px'; t.style.borderRadius='10px'; t.style.zIndex=9999; t.style.boxShadow='0 8px 30px rgba(0,0,0,0.3)'; t.innerText=msg; document.body.appendChild(t); setTimeout(()=> t.remove(), 3000); }
+  // Hook to show toasts on new notifications (simple)
+  // (For production add user preferences & throttling)
+
+  // Real-time: show toast when a new document is added (comparison)
+  let lastCount = 0;
+  onSnapshot(notesCol, snapshot => {
+    const currentCount = snapshot.size;
+    if(lastCount && currentCount > lastCount){
+      toast('New notification received');
+    }
+    lastCount = currentCount;
+  });
+
+</script>
+</body>
+</html>

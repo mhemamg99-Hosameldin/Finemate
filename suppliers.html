@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Suppliers</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- XLSX for Excel export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    :root{
+      --blue-900: #0b3d91;
+      --blue-700: #1464c9;
+      --blue-500: #2a9df4;
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --muted: #6b7280;
+      --accent: #17a2b8;
+      --radius: 12px;
+      --glass: rgba(255,255,255,0.6);
+    }
+    [data-theme="dark"]{
+      --bg: #0f1724;
+      --panel:#0f1724;
+      --muted:#9ca3af;
+      --blue-900:#071733;
+      --blue-700:#0a3a6b;
+      --blue-500:#1f6fb3;
+      --glass: rgba(255,255,255,0.03);
+    }
+
+    *{box-sizing:border-box;font-family:Inter, "Segoe UI", Roboto, system-ui, -apple-system, Arial}
+    body{
+      margin:0;
+      background: linear-gradient(180deg,var(--bg), #e9f2ff 300px);
+      color: #072036;
+      transition: background .3s, color .3s;
+      --sidebar-w:260px;
+      min-height:100vh;
+    }
+    [data-theme="dark"] body{ color:#e6eef8; }
+
+    /* layout */
+    .app{ display:flex; min-height:100vh; }
+    .sidebar{
+      width:var(--sidebar-w);
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color:#fff;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      position:fixed; left:0; top:0; bottom:0;
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem }
+    .brand i{ font-size:1.35rem }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+    main.main{
+      margin-left:var(--sidebar-w);
+      padding:24px; width:calc(100% - var(--sidebar-w));
+    }
+
+    /* topbar */
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px }
+    .search{ flex:1; max-width:540px; display:flex; gap:8px; align-items:center }
+    .search input{
+      width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,0.06);
+      background:var(--panel); box-shadow: 0 2px 8px rgba(11,18,32,0.04);
+    }
+    .controls{ display:flex; gap:10px; align-items:center }
+
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; cursor:pointer; border:none; font-weight:600 }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; box-shadow:0 8px 18px rgba(42,157,244,0.14) }
+    .btn-ghost{ background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted) }
+    .icon-btn{ background:var(--panel); padding:8px; border-radius:10px; border:1px solid rgba(15,23,42,0.05) }
+
+    /* header area stats */
+    .stats{ display:flex; gap:16px; margin-bottom:18px }
+    .stat-card{ background:var(--panel); padding:14px; border-radius:12px; min-width:150px; display:flex; gap:12px; align-items:center; box-shadow:0 6px 20px rgba(16,24,40,0.04) }
+    .stat-card .icon{ width:46px; height:46px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:1.15rem }
+    .stat-card h4{ margin:0; font-size:1.05rem }
+    .muted{ color:var(--muted) }
+
+    /* content grid */
+    .content-grid{ display:grid; grid-template-columns: 1fr 380px; gap:18px; align-items:start }
+
+    /* suppliers table */
+    .card{ background:var(--panel); border-radius:12px; padding:16px; box-shadow:0 6px 20px rgba(16,24,40,0.04); transition: transform .28s, box-shadow .28s; overflow:hidden }
+    .card:hover{ transform:translateY(-6px); box-shadow:0 16px 36px rgba(16,24,40,0.08) }
+    table{ width:100%; border-collapse:collapse; font-size:.95rem }
+    thead th{ text-align:left; color:var(--muted); font-weight:700; padding:10px 8px; font-size:.86rem; border-bottom:1px solid rgba(0,0,0,0.04) }
+    tbody tr{ transition: background .18s, transform .18s; border-bottom:1px solid rgba(0,0,0,0.04) }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform:translateX(4px) }
+    td{ padding:12px 8px; vertical-align:middle; }
+
+    .badge-active{ background:#16a34a;color:#fff;padding:6px 10px;border-radius:999px;font-weight:700 }
+    .badge-inactive{ background:#374151;color:#fff;padding:6px 10px;border-radius:999px;font-weight:700 }
+
+    /* sidebar panel (right) */
+    .panel-quick{ display:flex; flex-direction:column; gap:12px }
+    .filter-row{ display:flex; gap:8px; margin-bottom:10px }
+    select, input[type="date"]{ padding:8px 10px; border-radius:8px; border:1px solid rgba(15,23,42,0.06); width:100% }
+
+    /* modal */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(2,6,23,0.45); display:flex; align-items:center; justify-content:center; z-index:60 }
+    .modal{ width:720px; max-width:95%; background:var(--panel); border-radius:12px; padding:18px; box-shadow:0 20px 60px rgba(2,6,23,0.6) }
+    .modal h3{ margin:0 0 12px 0 }
+    .form-group{ margin-bottom:12px }
+    .form-group label{ display:block; margin-bottom:6px; font-weight:600 }
+    .form-row{ display:flex; gap:10px }
+    .form-row .col{ flex:1 }
+
+    /* actions */
+    .action-btn{ background:transparent; border:1px solid rgba(11,18,32,0.05); padding:6px 8px; border-radius:8px }
+
+    /* responsiveness */
+    @media (max-width:1000px){
+      .content-grid{ grid-template-columns: 1fr; }
+    }
+
+    /* subtle animation for cards */
+    @keyframes popIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+    .card{ animation: popIn .45s ease both }
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+      <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+      <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+      <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-user"></i></div>
+        <div>
+          <div style="font-weight:700">Factory #12</div>
+          <div style="font-size:.85rem;opacity:.9">Plan: Enterprise</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2 style="margin:0">Suppliers</h2>
+        <div class="muted">Manage suppliers, contacts & purchase relationships</div>
+      </div>
+
+      <div class="controls">
+        <div class="search">
+          <input id="globalSearch" placeholder="Search by name, phone, email or address..." />
+        </div>
+
+        <button class="btn icon-btn" title="Notifications"><i class="fa-regular fa-bell"></i></button>
+        <button onclick="toggleTheme()" class="btn icon-btn" id="themeToggle" title="Toggle dark mode"><i class="fa-regular fa-moon"></i></button>
+        <button class="btn btn-primary" id="addSupplierBtn"><i class="fa-solid fa-plus"></i> Add Supplier</button>
+      </div>
+    </div>
+
+    <!-- stats -->
+    <div class="stats">
+      <div class="stat-card card">
+        <div class="icon" style="background:linear-gradient(135deg,var(--blue-500),var(--blue-700))"><i class="fa-solid fa-people-roof"></i></div>
+        <div>
+          <h4 id="totalSuppliers">0</h4>
+          <div class="muted">Total suppliers</div>
+        </div>
+      </div>
+      <div class="stat-card card">
+        <div class="icon" style="background:linear-gradient(135deg,#34d399,#10b981)"><i class="fa-solid fa-check"></i></div>
+        <div>
+          <h4 id="activeSuppliers">0</h4>
+          <div class="muted">Active</div>
+        </div>
+      </div>
+      <div class="stat-card card">
+        <div class="icon" style="background:linear-gradient(135deg,#f97316,#f59e0b)"><i class="fa-solid fa-clock"></i></div>
+        <div>
+          <h4 id="inactiveSuppliers">0</h4>
+          <div class="muted">Inactive</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-grid">
+      <!-- left: table -->
+      <section class="card" aria-label="Suppliers list">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <strong>Suppliers</strong>
+            <div class="muted" style="font-size:.92rem">List of suppliers and quick actions</div>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-ghost" id="exportCsvBtn"><i class="fa-solid fa-file-csv"></i> CSV</button>
+            <button class="btn btn-ghost" id="exportXlsxBtn"><i class="fa-solid fa-file-excel"></i> Excel</button>
+            <button class="btn btn-ghost" id="bulkDeleteBtn" title="Delete selected"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+
+        <!-- filters row -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <select id="statusFilter" style="padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.06)">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+
+          <input id="dateFrom" type="date" style="padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.06)" />
+          <input id="dateTo" type="date" style="padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.06)" />
+          <button class="btn btn-ghost" onclick="applyFilters()">Apply</button>
+          <button class="btn btn-ghost" onclick="clearFilters()">Clear</button>
+        </div>
+
+        <div style="overflow:auto; max-height:520px">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:40px"><input type="checkbox" id="selectAll" /></th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Address</th>
+                <th>Added</th>
+                <th>Status</th>
+                <th style="width:120px">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="suppliersTbody">
+              <!-- populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- right: panel -->
+      <aside class="card panel-quick" aria-label="Quick actions">
+        <div>
+          <strong>Quick actions</strong>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+          <button class="btn btn-primary" onclick="openAddModal()">+ New Supplier</button>
+          <button class="btn btn-ghost" onclick="importSample()">Import sample</button>
+          <button class="btn btn-ghost" onclick="exportAllAsJSON()">Export JSON</button>
+        </div>
+
+        <hr style="border:none;border-top:1px solid rgba(0,0,0,0.06)"/>
+
+        <div>
+          <strong>Help</strong>
+          <div class="muted" style="font-size:.92rem;margin-top:6px">You can connect this page to Firestore later — data is saved in localStorage for now.</div>
+        </div>
+      </aside>
+    </div>
+
+    <div style="height:18px"></div>
+    <div class="muted" style="font-size:.9rem">Tip: Click <i class="fa-solid fa-plus"></i> Add Supplier to create a new supplier.</div>
+
+    <div style="height:18px"></div>
+    <div class="muted page-footer">© 2025 FinMate — Accounting for Manufacturers</div>
+  </main>
+
+</div>
+
+<!-- Modal (Add / Edit) -->
+<div id="supplierModal" class="modal-backdrop" style="display:none" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle">Add Supplier</h3>
+
+    <div class="form-group">
+      <label for="s_name">Name</label>
+      <input id="s_name" class="form-control" placeholder="Supplier name" />
+    </div>
+
+    <div class="form-row">
+      <div class="col form-group">
+        <label for="s_phone">Phone</label>
+        <input id="s_phone" class="form-control" placeholder="+20 ..." />
+      </div>
+      <div class="col form-group">
+        <label for="s_email">Email</label>
+        <input id="s_email" class="form-control" placeholder="supplier@example.com" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="s_address">Address</label>
+      <input id="s_address" class="form-control" placeholder="City, street..." />
+    </div>
+
+    <div class="form-row">
+      <div class="col form-group">
+        <label for="s_status">Status</label>
+        <select id="s_status" class="form-control">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <div class="col form-group">
+        <label for="s_date">Added date</label>
+        <input id="s_date" type="date" class="form-control" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="s_notes">Notes</label>
+      <textarea id="s_notes" rows="3" class="form-control" placeholder="Any notes..."></textarea>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="saveSupplierBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Theme handling
+  (function(){
+    const dt = document.documentElement;
+    const saved = localStorage.getItem('bf_theme') || 'light';
+    dt.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+    if(saved === 'dark') document.getElementById('themeToggle').innerHTML = '<i class="fa-regular fa-sun"></i>';
+  })();
+  function toggleTheme(){
+    const dt = document.documentElement;
+    const current = dt.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    dt.setAttribute('data-theme', next);
+    localStorage.setItem('bf_theme', next);
+    document.getElementById('themeToggle').innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  }
+
+  // Storage key
+  const STORAGE_KEY = 'bluefactory_suppliers_v1';
+
+  // Utility
+  function uid(){ return 's_' + Math.random().toString(36).slice(2,9) }
+
+  // Load suppliers from localStorage
+  let suppliers = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+  // DOM refs
+  const tbody = document.getElementById('suppliersTbody');
+  const totalSuppliersEl = document.getElementById('totalSuppliers');
+  const activeSuppliersEl = document.getElementById('activeSuppliers');
+  const inactiveSuppliersEl = document.getElementById('inactiveSuppliers');
+
+  // Modal refs
+  const modal = document.getElementById('supplierModal');
+  const modalTitle = document.getElementById('modalTitle');
+  const saveBtn = document.getElementById('saveSupplierBtn');
+
+  let editingId = null;
+
+  // Initial render
+  function renderSuppliers(list = suppliers){
+    tbody.innerHTML = '';
+    if(!list.length){
+      tbody.innerHTML = `<tr><td colspan="8" class="muted" style="padding:20px;text-align:center">No suppliers yet — add one to get started.</td></tr>`;
+      updateStats();
+      return;
+    }
+    list.forEach(s => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="checkbox" data-id="${s.id}" class="row-check" /></td>
+        <td>${escapeHtml(s.name)}</td>
+        <td>${escapeHtml(s.phone||'-')}</td>
+        <td>${escapeHtml(s.email||'-')}</td>
+        <td>${escapeHtml(s.address||'-')}</td>
+        <td>${s.addedDate || '-'}</td>
+        <td>${s.status === 'active' ? '<span class="badge-active">Active</span>' : '<span class="badge-inactive">Inactive</span>'}</td>
+        <td>
+          <button class="action-btn" onclick="openEdit('${s.id}')"><i class="fa-solid fa-pen-to-square"></i></button>
+          <button class="action-btn" onclick="deleteSupplier('${s.id}')"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+    updateStats();
+  }
+
+  function updateStats(){
+    totalSuppliersEl.textContent = suppliers.length;
+    activeSuppliersEl.textContent = suppliers.filter(s=>s.status==='active').length;
+    inactiveSuppliersEl.textContent = suppliers.filter(s=>s.status==='inactive').length;
+  }
+
+  function persist(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(suppliers));
+  }
+
+  // open add modal
+  document.getElementById('addSupplierBtn').addEventListener('click', openAddModal);
+  function openAddModal(){
+    editingId = null;
+    modalTitle.textContent = 'Add Supplier';
+    setModalFields({ name:'', phone:'', email:'', address:'', status:'active', addedDate: new Date().toISOString().slice(0,10), notes:'' });
+    showModal();
+  }
+
+  function openEdit(id){
+    const s = suppliers.find(x=>x.id===id);
+    if(!s) return alert('Supplier not found');
+    editingId = id;
+    modalTitle.textContent = 'Edit Supplier';
+    setModalFields(s);
+    showModal();
+  }
+
+  function setModalFields(s){
+    document.getElementById('s_name').value = s.name || '';
+    document.getElementById('s_phone').value = s.phone || '';
+    document.getElementById('s_email').value = s.email || '';
+    document.getElementById('s_address').value = s.address || '';
+    document.getElementById('s_status').value = s.status || 'active';
+    document.getElementById('s_date').value = s.addedDate || '';
+    document.getElementById('s_notes').value = s.notes || '';
+  }
+
+  function getModalFields(){
+    return {
+      name: document.getElementById('s_name').value.trim(),
+      phone: document.getElementById('s_phone').value.trim(),
+      email: document.getElementById('s_email').value.trim(),
+      address: document.getElementById('s_address').value.trim(),
+      status: document.getElementById('s_status').value,
+      addedDate: document.getElementById('s_date').value,
+      notes: document.getElementById('s_notes').value.trim()
+    };
+  }
+
+  function showModal(){
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden','false');
+  }
+  function closeModal(){
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden','true');
+    editingId = null;
+  }
+
+  // save supplier
+  saveBtn.addEventListener('click', ()=>{
+    const data = getModalFields();
+    if(!data.name){ alert('Name is required'); return; }
+    if(editingId){
+      // update
+      suppliers = suppliers.map(s => {
+        if(s.id === editingId) return { ...s, ...data };
+        return s;
+      });
+    } else {
+      // add
+      const newSupplier = { id: uid(), ...data, createdAt: Date.now() };
+      suppliers.unshift(newSupplier);
+    }
+    persist();
+    renderSuppliers();
+    closeModal();
+  });
+
+  // delete supplier
+  function deleteSupplier(id){
+    if(!confirm('Delete this supplier?')) return;
+    suppliers = suppliers.filter(s => s.id !== id);
+    persist();
+    renderSuppliers();
+  }
+
+  // bulk delete
+  document.getElementById('bulkDeleteBtn').addEventListener('click', ()=>{
+    const checked = Array.from(document.querySelectorAll('.row-check:checked')).map(ch => ch.getAttribute('data-id'));
+    if(!checked.length) return alert('No rows selected');
+    if(!confirm(`Delete ${checked.length} suppliers?`)) return;
+    suppliers = suppliers.filter(s => !checked.includes(s.id));
+    persist();
+    renderSuppliers();
+  });
+
+  // select all
+  document.getElementById('selectAll').addEventListener('change', function(){
+    document.querySelectorAll('.row-check').forEach(ch => ch.checked = this.checked);
+  });
+
+  // search
+  document.getElementById('globalSearch').addEventListener('input', function(){
+    const q = this.value.trim().toLowerCase();
+    if(!q) return renderSuppliers();
+    const filtered = suppliers.filter(s => {
+      return [s.name, s.phone, s.email, s.address, s.notes].join(' ').toLowerCase().includes(q);
+    });
+    renderSuppliers(filtered);
+  });
+
+  // filters
+  function applyFilters(){
+    const status = document.getElementById('statusFilter').value;
+    const from = document.getElementById('dateFrom').value;
+    const to = document.getElementById('dateTo').value;
+    let filtered = suppliers.slice();
+    if(status !== 'all') filtered = filtered.filter(s => s.status === status);
+    if(from) filtered = filtered.filter(s => (s.addedDate || '') >= from);
+    if(to) filtered = filtered.filter(s => (s.addedDate || '') <= to);
+    renderSuppliers(filtered);
+  }
+  function clearFilters(){
+    document.getElementById('statusFilter').value = 'all';
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value = '';
+    renderSuppliers();
+  }
+
+  // export CSV
+  document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
+  function exportCSV(){
+    if(!suppliers.length) return alert('No suppliers to export');
+    const rows = [['Name','Phone','Email','Address','Status','Added Date','Notes']];
+    suppliers.forEach(s => rows.push([s.name,s.phone||' ',s.email||' ',s.address||' ',s.status||' ',s.addedDate||' ',s.notes||' ']));
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'suppliers.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // export Excel (xlsx)
+  document.getElementById('exportXlsxBtn').addEventListener('click', ()=>{
+    if(!suppliers.length) return alert('No suppliers to export');
+    const ws_data = [
+      ['Name','Phone','Email','Address','Status','Added Date','Notes'],
+      ...suppliers.map(s => [s.name,s.phone||'',s.email||'',s.address||'',s.status||'',s.addedDate||'',s.notes||''])
+    ];
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Suppliers');
+    XLSX.writeFile(wb, 'suppliers.xlsx');
+  });
+
+  // export JSON
+  function exportAllAsJSON(){
+    if(!suppliers.length) return alert('No suppliers to export');
+    const blob = new Blob([JSON.stringify(suppliers, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'suppliers.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // import sample data helper
+  function importSample(){
+    const sample = [
+      { id: uid(), name:'Ayman Trading', phone:'+20 100 111 222', email:'ayman@example.com', address:'Cairo, Egypt', status:'active', addedDate:'2025-06-20', notes:'Preferred supplier' },
+      { id: uid(), name:'Nile Packaging', phone:'+20 122 333 444', email:'nile@pack.com', address:'Alexandria, Egypt', status:'active', addedDate:'2025-05-10', notes:'' },
+      { id: uid(), name:'Delta Spares', phone:'+20 133 444 555', email:'sales@deltaspares.com', address:'Giza, Egypt', status:'inactive', addedDate:'2024-11-02', notes:'Seasonal' }
+    ];
+    suppliers = sample.concat(suppliers);
+    persist();
+    renderSuppliers();
+  }
+
+  // open inventory placeholder (from right panel)
+  function openInventory(){ alert('Open inventory page (implement navigation)'); }
+
+  // esc to close modal
+  document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeModal(); });
+
+  // helper: escape html
+  function escapeHtml(s=''){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') }
+
+  // initialize
+  (function init(){
+    renderSuppliers();
+  })();
+
+  // helper: open modal externally
+  function showAddModalPublic(){ openAddModal(); }
+  // expose to window in case needed by external code
+  window.openAddModal = openAddModal;
+  window.openEdit = openEdit;
+  window.exportAllAsJSON = exportAllAsJSON;
+</script>
+</body>
+</html>

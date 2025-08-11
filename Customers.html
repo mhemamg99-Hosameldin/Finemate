@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Customers</title>
+
+  <!-- Icons -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    /* ---------- Theme variables (BlueFactory) ---------- */
+    :root{
+      --blue-900:#0b3d91; --blue-700:#1464c9; --blue-500:#2a9df4;
+      --bg:#f4f7fb; --panel:#ffffff; --muted:#6b7280;
+      --glass:rgba(255,255,255,0.6);
+      --accent:#17a2b8;
+    }
+    [data-theme="dark"]{
+      --bg:#0f1724; --panel:#111827; --muted:#9ca3af;
+      --blue-900:#071733; --blue-700:#0a3a6b; --blue-500:#1f6fb3;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg), #e9f2ff 360px); color:#0b1220;
+      --sidebar-w:260px; transition: background .35s, color .35s;
+    }
+    [data-theme="dark"] body{ color:#e6eef8; }
+
+    .app{ display:flex; min-height:100vh; }
+
+    /* Sidebar */
+    .sidebar{
+      width:var(--sidebar-w); background:linear-gradient(180deg,var(--blue-900),var(--blue-700));
+      color:#fff; padding:18px; display:flex; flex-direction:column; gap:14px; position:fixed; left:0; top:0; bottom:0;
+      box-shadow: 0 6px 24px rgba(10,25,60,0.12);
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem; color:#fff; transform:translateY(-1px) }
+     /* Sidebar */
+     .sidebar{
+      width:var(--sidebar-w);
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color: #fff;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      position:fixed;
+      left:0; top:0; bottom:0;
+      box-shadow: 0 6px 24px rgba(10,25,60,0.12);
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem; color: #fff; transform:translateY(-1px) }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+    /* Main content */
+    .main{ margin-left:var(--sidebar-w); padding:24px; width:calc(100% - var(--sidebar-w)); transition: width .3s, margin-left .3s; }
+
+    /* Topbar */
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+    .search{ flex:1; max-width:540px; display:flex; gap:8px; align-items:center; }
+    .search input{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,0.06); background:var(--panel); box-shadow:0 2px 8px rgba(11,18,32,0.04); }
+    .controls{ display:flex; gap:10px; align-items:center; }
+
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; cursor:pointer; border:none; font-weight:600; }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; box-shadow: 0 8px 18px rgba(42,157,244,0.14); }
+    .btn-ghost{ background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted); padding:8px 10px; border-radius:10px; }
+
+    /* Page header */
+    .page-header{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px }
+    .page-header h1{ margin:0; font-size:1.45rem }
+
+    /* Cards & layout */
+    .card{ background:var(--panel); border-radius:12px; padding:16px; box-shadow:0 6px 20px rgba(16,24,40,0.04); transition: transform .28s, box-shadow .28s; }
+    .card:hover{ transform:translateY(-6px); box-shadow:0 16px 36px rgba(16,24,40,0.08) }
+
+    /* Customers table */
+    .table-wrap{ margin-top:14px; overflow:auto; }
+    table{ width:100%; border-collapse:collapse; font-size:.95rem; min-width:880px }
+    thead th{ text-align:left; color:var(--muted); font-weight:700; padding:12px 8px; font-size:0.85rem; border-bottom:1px solid rgba(0,0,0,0.06) }
+    tbody tr{ transition: background .18s, transform .18s; }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform: translateX(4px) }
+    td{ padding:12px 8px; vertical-align:middle }
+
+    .tag{ display:inline-block; padding:6px 8px; border-radius:999px; background:#eef7ff; color:var(--blue-700); font-weight:600; font-size:0.85rem; }
+    .action-btn{ border: none; background:transparent; cursor:pointer; color:var(--muted); padding:6px; border-radius:8px }
+    .action-btn:hover{ background:rgba(0,0,0,0.04); color:var(--blue-700) }
+
+    /* Modal (simple) */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(8,16,40,0.45); display:flex; align-items:center; justify-content:center; z-index:1000; }
+    .modal{ width:100%; max-width:760px; background:var(--panel); border-radius:12px; padding:18px; box-shadow:0 18px 48px rgba(10,25,60,0.35) }
+    .modal h3{ margin-top:0 }
+    .form-row{ display:flex; gap:12px; margin-bottom:12px; }
+    .form-row .col{ flex:1 }
+
+    /* Responsive */
+    @media (max-width:1100px){
+      :root{ --sidebar-w:72px }
+      .sidebar{ width:var(--sidebar-w); padding:12px }
+      .brand span{ display:none }
+      .main{ margin-left:var(--sidebar-w); width:calc(100% - var(--sidebar-w)); padding:14px; }
+      .table-wrap{ overflow:auto }
+      table{ min-width:700px }
+    }
+
+    /* small animation */
+    @keyframes popIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+    .card{ animation: popIn .45s ease both }
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="app" id="app">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" aria-label="Sidebar">
+        <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate</span></div>
+        <nav class="nav-links" aria-label="Main navigation">
+          <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+          <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+          <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+          <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+          <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+          <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+          <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+          <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+          <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+          <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+          <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+          <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+          <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+          <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+          <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+          <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+          <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+          <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+        </nav>
+        <div class="sidebar-footer">Factory #12 • Plan: Enterprise</div>
+      </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2 style="margin:0">Customers</h2>
+        <div style="color:var(--muted)">Manage customer records, contacts & activity</div>
+      </div>
+
+      <div class="controls">
+        <div class="search">
+          <input id="globalSearch" placeholder="Search customers by name, email, phone or ref..." />
+        </div>
+        <button class="btn btn-ghost" id="exportCsvBtn" title="Export customers CSV"><i class="fa-solid fa-file-csv"></i></button>
+        <button class="btn btn-ghost" id="themeToggle" title="Toggle dark mode"><i class="fa-regular fa-moon"></i></button>
+        <button class="btn btn-primary" id="openAddBtn"><i class="fa-solid fa-plus"></i> Add Customer</button>
+      </div>
+    </div>
+
+    <!-- Page header -->
+    <div class="page-header">
+      <div>
+        <strong>Customer Directory</strong>
+        <div style="color:var(--muted); font-size:.95rem">Real-time list synced with Firestore</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="tagFilter" class="btn-ghost" style="padding:8px;border-radius:10px;">
+          <option value="all">All tags</option>
+          <option value="retail">Retail</option>
+          <option value="wholesale">Wholesale</option>
+          <option value="vip">VIP</option>
+        </select>
+        <button class="btn btn-ghost" id="refreshBtn"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
+      </div>
+    </div>
+
+    <!-- Cards + Table -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;gap:18px;align-items:center">
+          <div>
+            <strong id="totalCustomers">0</strong>
+            <div style="color:var(--muted);font-size:.9rem">Total customers</div>
+          </div>
+          <div style="border-left:1px solid rgba(0,0,0,0.06);padding-left:12px">
+            <strong id="activeCustomers">0</strong>
+            <div style="color:var(--muted);font-size:.9rem">Active (recent)</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost" id="importBtn"><i class="fa-solid fa-file-import"></i> Import</button>
+          <button class="btn btn-ghost" id="bulkDeleteBtn" title="Delete selected (disabled)"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="customersTable">
+          <thead>
+            <tr>
+              <th style="width:36px"><input id="selectAll" type="checkbox" /></th>
+              <th><a href="#" data-sort="name">Name <i class="fa-solid fa-sort"></i></a></th>
+              <th><a href="#" data-sort="company">Company</a></th>
+              <th><a href="#" data-sort="email">Email</a></th>
+              <th>Phone</th>
+              <th>Tags</th>
+              <th>Created</th>
+              <th style="width:120px">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="customersBody">
+            <!-- rows rendered by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="height:18px"></div>
+    <div class="page-footer">© 2025 BlueFactory — Accounting for Manufacturers</div>
+  </main>
+
+</div>
+
+<!-- Modal template (hidden initially) -->
+<div id="modalRoot" style="display:none"></div>
+
+<!-- Firebase v9 modular SDK (CDN) -->
+<script type="module">
+  // ----------- Firebase setup (replace placeholders) -----------
+  // IMPORTANT: Replace the config object below with your Firebase project's config.
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, setDoc, doc, onSnapshot, query, orderBy, deleteDoc, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+  import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    // ... other settings
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+
+  // auto sign-in anonymously for demo (replace with your auth)
+  signInAnonymously(auth).catch(err => console.error('Auth err', err));
+
+  // -------------- DOM helpers --------------
+  const modalRoot = document.getElementById('modalRoot');
+  const customersBody = document.getElementById('customersBody');
+  const totalCustomers = document.getElementById('totalCustomers');
+  const activeCustomers = document.getElementById('activeCustomers');
+  const globalSearch = document.getElementById('globalSearch');
+  const tagFilter = document.getElementById('tagFilter');
+  const themeToggle = document.getElementById('themeToggle');
+  const exportCsvBtn = document.getElementById('exportCsvBtn');
+  const openAddBtn = document.getElementById('openAddBtn');
+  const refreshBtn = document.getElementById('refreshBtn');
+
+  // collection reference
+  const customersCol = collection(db, 'customers');
+
+  // -------------- Modal creation --------------
+  function openModal(contentHtml){
+    modalRoot.innerHTML = `
+      <div class="modal-backdrop">
+        <div class="modal" role="dialog">
+          ${contentHtml}
+        </div>
+      </div>
+    `;
+    modalRoot.style.display = 'block';
+    modalRoot.querySelector('.modal-backdrop').addEventListener('click', (e)=>{
+      if(e.target.classList.contains('modal-backdrop')) closeModal();
+    });
+  }
+  function closeModal(){ modalRoot.innerHTML=''; modalRoot.style.display='none'; }
+
+  // -------------- Add / Edit Customer Form --------------
+  function showAddEditModal(existing = null){
+    const isEdit = !!existing;
+    const html = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3>${isEdit? 'Edit customer' : 'Add new customer'}</h3>
+        <button class="btn-ghost" id="closeModalBtn"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <hr/>
+      <form id="customerForm">
+        <div class="form-row">
+          <div class="col">
+            <label>Name</label>
+            <input name="name" class="form-control" required value="${existing? escapeHtml(existing.name) : ''}" />
+          </div>
+          <div class="col">
+            <label>Company</label>
+            <input name="company" class="form-control" value="${existing? escapeHtml(existing.company||'') : ''}" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="col">
+            <label>Email</label>
+            <input name="email" type="email" class="form-control" value="${existing? escapeHtml(existing.email||'') : ''}" />
+          </div>
+          <div class="col">
+            <label>Phone</label>
+            <input name="phone" class="form-control" value="${existing? escapeHtml(existing.phone||'') : ''}" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="col">
+            <label>Tags (comma separated)</label>
+            <input name="tags" class="form-control" value="${existing? escapeHtml((existing.tags||[]).join(',')) : ''}" />
+          </div>
+          <div class="col">
+            <label>Notes</label>
+            <input name="notes" class="form-control" value="${existing? escapeHtml(existing.notes||'') : ''}" />
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+          <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary">${isEdit? 'Save changes' : 'Create customer'}</button>
+        </div>
+      </form>
+    `;
+    openModal(html);
+
+    document.getElementById('closeModalBtn').onclick = closeModal;
+    document.getElementById('cancelBtn').onclick = closeModal;
+
+    document.getElementById('customerForm').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const payload = {
+        name: form.get('name').trim(),
+        company: form.get('company')?.trim() || '',
+        email: form.get('email')?.trim() || '',
+        phone: form.get('phone')?.trim() || '',
+        tags: form.get('tags') ? form.get('tags').split(',').map(t=>t.trim()).filter(Boolean) : [],
+        notes: form.get('notes')?.trim() || '',
+        updatedAt: serverTimestamp()
+      };
+
+      try {
+        if(isEdit && existing._id){
+          // update existing doc
+          const ref = doc(db, 'customers', existing._id);
+          await updateDoc(ref, payload);
+        } else {
+          // add new doc
+          await addDoc(customersCol, { ...payload, createdAt: serverTimestamp() });
+        }
+        closeModal();
+      } catch(err){
+        alert('Error saving customer: ' + err.message);
+        console.error(err);
+      }
+    });
+  }
+
+  // -------------- Utilities --------------
+  function escapeHtml(s = ''){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function formatDate(ts){
+    if(!ts) return '-';
+    try{
+      const date = ts.toDate ? ts.toDate() : new Date(ts);
+      return date.toISOString().slice(0,10);
+    }catch(e){ return '-'; }
+  }
+
+  // -------------- Real-time listener --------------
+  // Query: order by createdAt descending if exists else by name
+  const q = query(customersCol, orderBy('createdAt', 'desc'));
+  let customersSnapshotUnsub = null;
+
+  function attachRealtimeListener(){
+    if(customersSnapshotUnsub) customersSnapshotUnsub(); // detach if existed
+    customersSnapshotUnsub = onSnapshot(q, snapshot => {
+      const list = [];
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+        d._id = docSnap.id;
+        list.push(d);
+      });
+      // store list in memory for filtering/sorting
+      window._customersList = list;
+      renderCustomers(list);
+    }, err => {
+      console.error('Firestore snapshot error:', err);
+      alert('Realtime update error: ' + err.message);
+    });
+  }
+
+  attachRealtimeListener();
+
+  // -------------- Render table, filtering, sorting --------------
+  let currentSort = { field: 'createdAt', asc:false };
+
+  function renderCustomers(list){
+    // apply tag filter
+    const tag = tagFilter.value;
+    let filtered = list.slice();
+    if(tag && tag !== 'all'){
+      filtered = filtered.filter(c => (c.tags||[]).includes(tag));
+    }
+    // search
+    const q = (globalSearch.value || '').trim().toLowerCase();
+    if(q){
+      filtered = filtered.filter(c => {
+        return [c.name, c.company, c.email, c.phone, c._id].join(' ').toLowerCase().includes(q);
+      });
+    }
+    // sort
+    filtered.sort((a,b)=>{
+      const f = currentSort.field;
+      let va = (a[f] || '').toString().toLowerCase();
+      let vb = (b[f] || '').toString().toLowerCase();
+      if(f === 'createdAt'){
+        va = a.createdAt ? a.createdAt.seconds || 0 : 0;
+        vb = b.createdAt ? b.createdAt.seconds || 0 : 0;
+      }
+      if(va < vb) return currentSort.asc ? -1 : 1;
+      if(va > vb) return currentSort.asc ? 1 : -1;
+      return 0;
+    });
+
+    // stats
+    totalCustomers.textContent = list.length;
+    activeCustomers.textContent = list.filter(c => {
+      // consider active if updated in last 90 days
+      if(!c.updatedAt && !c.createdAt) return false;
+      const t = (c.updatedAt?.seconds || c.createdAt?.seconds || 0) * 1000;
+      return (Date.now() - t) < (90*24*3600*1000);
+    }).length;
+
+    // render rows
+    customersBody.innerHTML = '';
+    filtered.forEach(c => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input class="rowSelect" data-id="${c._id}" type="checkbox" /></td>
+        <td><strong>${escapeHtml(c.name||'-')}</strong><div style="color:var(--muted);font-size:.85rem">${escapeHtml(c.company||'')}</div></td>
+        <td>${escapeHtml(c.company||'-')}</td>
+        <td><a href="mailto:${escapeHtml(c.email||'')}" style="color:var(--blue-700)">${escapeHtml(c.email||'-')}</a></td>
+        <td>${escapeHtml(c.phone||'-')}</td>
+        <td>${ (c.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join(' ') }</td>
+        <td>${formatDate(c.createdAt)}</td>
+        <td>
+          <button class="action-btn" data-action="edit" data-id="${c._id}"><i class="fa-solid fa-pen-to-square"></i></button>
+          <button class="action-btn" data-action="delete" data-id="${c._id}"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      `;
+      customersBody.appendChild(tr);
+    });
+
+    // attach action listeners
+    customersBody.querySelectorAll('[data-action]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = btn.dataset.id;
+        const action = btn.dataset.action;
+        const cust = (window._customersList || []).find(x=>x._id===id);
+        if(action === 'edit') showAddEditModal(cust);
+        if(action === 'delete'){
+          if(confirm(`Delete customer "${cust.name}"? This action cannot be undone.`)){
+            try {
+              await deleteDoc(doc(db,'customers', id));
+            } catch(err){ alert('Delete error: ' + err.message) }
+          }
+        }
+      });
+    });
+  }
+
+  // -------------- Sorting handlers --------------
+  document.querySelectorAll('thead a[data-sort]').forEach(a=>{
+    a.addEventListener('click', (e)=>{
+      e.preventDefault();
+      const f = a.getAttribute('data-sort');
+      if(currentSort.field === f) currentSort.asc = !currentSort.asc;
+      else { currentSort.field = f; currentSort.asc = true; }
+      renderCustomers(window._customersList || []);
+    });
+  });
+
+  // -------------- filters / search --------------
+  globalSearch.addEventListener('input', ()=> renderCustomers(window._customersList || []));
+  tagFilter.addEventListener('change', ()=> renderCustomers(window._customersList || []));
+
+  // -------------- open add modal --------------
+  openAddBtn.addEventListener('click', ()=> showAddEditModal());
+
+  // refresh button (re-attach)
+  refreshBtn.addEventListener('click', ()=> {
+    attachRealtimeListener();
+    alert('Refreshed realtime listener.');
+  });
+
+  // theme toggle
+  themeToggle.addEventListener('click', ()=>{
+    const dt = document.documentElement;
+    const current = dt.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    dt.setAttribute('data-theme', next);
+    localStorage.setItem('bf_theme', next);
+    themeToggle.innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  });
+  // restore theme
+  (function(){ const saved = localStorage.getItem('bf_theme'); if(saved) document.documentElement.setAttribute('data-theme', saved); })();
+
+  // export CSV
+  exportCsvBtn.addEventListener('click', ()=>{
+    const rows = [['Name','Company','Email','Phone','Tags','Notes','Created']];
+    (window._customersList || []).forEach(c => rows.push([
+      c.name||'', c.company||'', c.email||'', c.phone||'', (c.tags||[]).join(';'), c.notes||'', formatDate(c.createdAt)
+    ]));
+    const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'customers.csv'; a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // simple import placeholder
+  document.getElementById('importBtn').addEventListener('click', ()=> alert('CSV import not implemented in demo.'));
+
+  // helper: listen to add/edit modal from outside (close by Escape)
+  window.addEventListener('keydown', (e)=> { if(e.key === 'Escape') document.getElementById('modalRoot').innerHTML = ''; });
+
+</script>
+</body>
+</html>
+

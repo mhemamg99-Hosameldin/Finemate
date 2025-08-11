@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Purchase Orders</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    /* ---------- Theme variables (same as BlueFactory) ---------- */
+    :root{
+      --blue-900: #0b3d91;
+      --blue-700: #1464c9;
+      --blue-500: #2a9df4;
+      --accent: #17a2b8;
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --muted: #6b7280;
+      --glass: rgba(255,255,255,0.6);
+    }
+    [data-theme="dark"]{
+      --bg: #0f1724;
+      --panel: #111827;
+      --muted: #9ca3af;
+      --blue-900: #071733;
+      --blue-700: #0a3a6b;
+      --blue-500: #1f6fb3;
+      --glass: rgba(255,255,255,0.03);
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg), #e9f2ff 340px);
+      color: #0b1220;
+      transition: background .35s, color .35s;
+      min-height:100vh;
+      --sidebar-w:260px;
+    }
+    [data-theme="dark"] body{ color: #e6eef8; }
+
+    /* layout */
+    .app{ display:flex; min-height:100vh; }
+     /* Sidebar */
+     .sidebar{
+      width:var(--sidebar-w);
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color: #fff;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      position:fixed;
+      left:0; top:0; bottom:0;
+      box-shadow: 0 6px 24px rgba(10,25,60,0.12);
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem; color: #fff; transform:translateY(-1px) }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+
+    /* main */
+    .main{
+      margin-left:var(--sidebar-w); padding:24px; width:calc(100% - var(--sidebar-w));
+      transition: width .3s, margin-left .3s;
+    }
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+    .search{ flex:1; max-width:540px; display:flex; gap:8px; align-items:center; }
+    .search input{
+      width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,0.06);
+      background:var(--panel); box-shadow: 0 2px 8px rgba(11,18,32,0.04);
+    }
+    .controls{ display:flex; gap:8px; align-items:center; }
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; cursor:pointer; border:none; font-weight:600; }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; box-shadow: 0 8px 18px rgba(42,157,244,0.14); }
+    .btn-ghost { background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted); padding:8px 10px; border-radius:10px }
+    .icon-btn{ background:var(--panel); padding:8px; border-radius:10px; border:1px solid rgba(15,23,42,0.05) }
+
+    /* grid */
+    .grid{ display:grid; grid-template-columns: repeat(12, 1fr); gap:18px; align-items:start; }
+    .card{ background:var(--panel); border-radius:12px; padding:16px; box-shadow: 0 6px 20px rgba(16,24,40,0.04); transition: transform .28s, box-shadow .28s; overflow:hidden; }
+    .card:hover{ transform: translateY(-6px); box-shadow: 0 16px 36px rgba(16,24,40,0.08); }
+
+    /* purchase orders specific */
+    .po-header{ display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:12px; }
+    .filters{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+    .filters select, .filters input[type="date"] { padding:8px 10px; border-radius:8px; border:1px solid rgba(15,23,42,0.06); background:var(--panel) }
+    .table-wrapper{ overflow:auto; max-height:480px }
+    table{ width:100%; border-collapse: collapse; font-size:.95rem; min-width:900px }
+    thead th{ text-align:left; color:var(--muted); font-weight:700; padding:12px 8px; font-size:.86rem; background:linear-gradient(90deg,rgba(0,0,0,0.02),transparent) }
+    tbody tr{ transition: background .18s, transform .18s; border-bottom:1px solid rgba(0,0,0,0.04) }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform: translateX(4px); }
+    td{ padding:12px 8px; vertical-align:middle }
+
+    .status { padding:6px 10px; border-radius:999px; font-weight:700; font-size:.85rem; display:inline-block }
+    .status.open { background:#e6f2ff; color:var(--blue-700) }
+    .status.paid { background:#e6ffef; color:#059669 }
+    .status.partial { background:#fff7e6; color:#b45309 }
+    .status.cancel { background:#ffeeee; color:#dc2626 }
+
+    /* pagination */
+    .pagination { display:flex; gap:8px; justify-content:flex-end; align-items:center; margin-top:12px }
+    .page-btn { padding:6px 10px; border-radius:8px; border:1px solid rgba(15,23,42,0.06); background:var(--panel) }
+
+    /* modal */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:50 }
+    .modal { width:980px; max-width:95%; background:var(--panel); border-radius:12px; padding:18px; box-shadow:0 16px 60px rgba(2,6,23,0.5); max-height:90vh; overflow:auto }
+    .modal .row { display:flex; gap:12px; flex-wrap:wrap }
+    .line-items { margin-top:12px; border-radius:8px; overflow:auto; }
+    .line-items table { width:100%; min-width:720px; }
+
+    /* responsive */
+    @media (max-width:1100px){
+      :root{ --sidebar-w:72px } 
+      .sidebar{ width:var(--sidebar-w); padding:12px; }
+      .brand span{ display:none }
+      .main{ margin-left:var(--sidebar-w); width:calc(100% - var(--sidebar-w)); padding:14px; }
+      .grid{ grid-template-columns: repeat(6,1fr) }
+      table{ min-width:650px }
+    }
+    @media (max-width:640px){
+      .search{ display:none }
+      .sidebar{ position:fixed; z-index:50 }
+      .po-header{ flex-direction:column; align-items:stretch; gap:10px }
+    }
+
+    /* subtle animation */
+    @keyframes popIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+    .card{ animation: popIn .45s ease both }
+
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="app" id="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+      <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+      <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+      <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+    
+
+    <div class="sidebar-footer">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-circle-info"></i></div>
+        <div>
+          <div style="font-weight:700">Factory #12</div>
+          <div style="font-size:.85rem;opacity:.9">Plan: Enterprise</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2 style="margin:0">Purchase Orders</h2>
+        <div style="color:var(--muted)">Manage purchase orders, suppliers & receipts</div>
+      </div>
+
+      <div class="controls">
+        <div class="search">
+          <input id="globalSearch" placeholder="Search PO number, supplier, reference..." />
+        </div>
+
+        <button class="btn icon-btn" title="Notifications"><i class="fa-regular fa-bell"></i></button>
+        <button onclick="toggleTheme()" class="btn icon-btn" id="themeToggle" title="Toggle dark mode"><i class="fa-regular fa-moon"></i></button>
+        <button class="btn btn-primary" id="openNewPo"><i class="fa-solid fa-plus"></i> New Purchase Order</button>
+      </div>
+    </div>
+
+    <section class="grid">
+
+      <!-- list area -->
+      <div class="card" style="grid-column: span 12;">
+        <div class="po-header">
+          <div>
+            <strong>All Purchase Orders</strong>
+            <div style="color:var(--muted);font-size:.95rem">Create, view and manage purchase orders</div>
+          </div>
+
+          <div class="filters">
+            <select id="filterStatus">
+              <option value="all">Status: All</option>
+              <option value="open">Open</option>
+              <option value="partial">Partial</option>
+              <option value="paid">Paid</option>
+              <option value="cancel">Canceled</option>
+            </select>
+
+            <select id="filterSupplier">
+              <option value="all">Supplier: All</option>
+            </select>
+
+            <input type="date" id="filterFrom" title="From">
+            <input type="date" id="filterTo" title="To">
+
+            <button class="btn btn-ghost" onclick="resetFilters()">Reset</button>
+            <button class="btn btn-ghost" onclick="exportPOsCSV()">Export CSV</button>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table aria-label="Purchase Orders table">
+            <thead>
+              <tr>
+                <th>PO #</th>
+                <th>Date</th>
+                <th>Supplier</th>
+                <th>Items</th>
+                <th>Total</th>
+                <th>Tax</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="poTableBody">
+              <!-- populated by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination" id="pagination"></div>
+      </div>
+
+    </section>
+
+    <div class="page-footer">© 2025 BlueFactory — Accounting for Manufacturers</div>
+  </main>
+</div>
+
+<!-- Modal structure (hidden by default) -->
+<div id="poModalBackdrop" class="modal-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 id="modalTitle">New Purchase Order</h3>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="closePoModal()">Cancel</button>
+        <button class="btn btn-primary" id="savePoBtn">Save PO</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div style="flex:1;min-width:220px">
+        <label>PO Number</label>
+        <input id="poNumber" type="text" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.08)" />
+      </div>
+      <div style="width:180px">
+        <label>Date</label>
+        <input id="poDate" type="date" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.08)" />
+      </div>
+      <div style="flex:1;min-width:220px">
+        <label>Supplier</label>
+        <input id="poSupplier" type="text" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.08)" placeholder="Supplier name" />
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label>Reference / Notes</label>
+      <input id="poRef" type="text" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.08)" placeholder="Optional reference or notes" />
+    </div>
+
+    <div class="line-items" style="margin-top:12px">
+      <strong>Line items</strong>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:34%">Item / Description</th>
+            <th style="width:12%">Qty</th>
+            <th style="width:14%">Unit Price</th>
+            <th style="width:14%">Discount</th>
+            <th style="width:12%">Tax %</th>
+            <th style="width:12%">Line Total</th>
+            <th style="width:8%"></th>
+          </tr>
+        </thead>
+        <tbody id="lineItemsBody"></tbody>
+      </table>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-ghost" onclick="addLineItem()">+ Add item</button>
+        <div style="margin-left:auto;text-align:right">
+          <div style="color:var(--muted)">Subtotal: <span id="poSubtotal">$0</span></div>
+          <div style="color:var(--muted)">Tax: <span id="poTaxTotal">$0</span></div>
+          <div style="font-weight:800;margin-top:6px">Total: <span id="poTotal">$0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px; text-align:right; color:var(--muted)">
+      <small>Tip: taxes, discounts and payment status will be saved with PO.</small>
+    </div>
+  </div>
+</div>
+
+<script>
+  // theme load
+  (function(){
+    const dt = document.documentElement;
+    const saved = localStorage.getItem('bf_theme') || 'light';
+    dt.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+    if(saved === 'dark') document.getElementById('themeToggle').innerHTML = '<i class="fa-regular fa-sun"></i>';
+  })();
+  function toggleTheme(){
+    const dt = document.documentElement;
+    const current = dt.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    dt.setAttribute('data-theme', next);
+    localStorage.setItem('bf_theme', next);
+    document.getElementById('themeToggle').innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  }
+
+  /* ---------- Local storage & sample data ---------- */
+  const POKEY = 'bf_purchase_orders_v1';
+  const SUPPLERS_KEY = 'bf_suppliers_v1';
+
+  let poList = JSON.parse(localStorage.getItem(POKEY)) || [
+    { id: 'PO-2025-001', date:'2025-08-01', supplier:'Moulinex Egypt', items:[{desc:'Blender LM2421EG', qty:3, price:330, tax:14, discount:0}], status:'open', ref:'Urgent', created:Date.now() },
+    { id: 'PO-2025-002', date:'2025-08-04', supplier:'ElectroParts Co', items:[{desc:'Power Supply A', qty:10, price:45, tax:14, discount:0}], status:'partial', ref:'Partial received', created:Date.now() },
+  ];
+
+  let suppliers = JSON.parse(localStorage.getItem(SUPPLIERS_KEY)) || ['Moulinex Egypt','ElectroParts Co','PackHouse Supplies'];
+
+  // persist to storage
+  function persist(){
+    localStorage.setItem(POKEY, JSON.stringify(poList));
+    localStorage.setItem(SUPPLIERS_KEY, JSON.stringify(suppliers));
+  }
+
+  /* ---------- rendering & helpers ---------- */
+  const pageSize = 6;
+  let currentPage = 1;
+
+  function calcLineTotal(li){
+    const qty = Number(li.qty)||0;
+    const price = Number(li.price)||0;
+    const discount = Number(li.discount)||0;
+    const taxPct = Number(li.tax)||0;
+    const before = qty * price * (1 - (discount/100));
+    const tax = before * (taxPct/100);
+    return { line: +(before + tax).toFixed(2), before:+before.toFixed(2), tax:+tax.toFixed(2) };
+  }
+
+  function sumTotals(items){
+    let subtotal = 0, tax=0, total=0;
+    items.forEach(it=>{
+      const r = calcLineTotal(it);
+      subtotal += r.before;
+      tax += r.tax;
+      total += r.line;
+    });
+    return {subtotal: +subtotal.toFixed(2), tax: +tax.toFixed(2), total: +total.toFixed(2)};
+  }
+
+  function renderSuppliersFilter(){
+    const sel = document.getElementById('filterSupplier');
+    sel.innerHTML = '<option value="all">Supplier: All</option>';
+    suppliers.forEach(s=> sel.innerHTML += `<option value="${s}">${s}</option>`);
+  }
+
+  function renderTable(){
+    const tbody = document.getElementById('poTableBody');
+    tbody.innerHTML = '';
+
+    // apply filters
+    const status = document.getElementById('filterStatus').value;
+    const supplier = document.getElementById('filterSupplier').value;
+    const from = document.getElementById('filterFrom').value;
+    const to = document.getElementById('filterTo').value;
+    const q = document.getElementById('globalSearch').value.trim().toLowerCase();
+
+    let filtered = poList.filter(po=>{
+      if(status !== 'all' && po.status !== status) return false;
+      if(supplier !== 'all' && po.supplier !== supplier) return false;
+      if(from && po.date < from) return false;
+      if(to && po.date > to) return false;
+      if(q){
+        const hay = [po.id, po.supplier, po.ref, po.date].join(' ').toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    // pagination
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    currentPage = Math.min(currentPage, totalPages);
+    const start = (currentPage-1)*pageSize;
+    filtered = filtered.slice(start, start + pageSize);
+
+    filtered.forEach(po=>{
+      const totals = sumTotals(po.items);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${po.id}</strong></td>
+        <td>${po.date}</td>
+        <td>${po.supplier}</td>
+        <td>${po.items.length}</td>
+        <td>$${totals.subtotal.toLocaleString()}</td>
+        <td>$${totals.tax.toLocaleString()}</td>
+        <td><span class="status ${po.status}">${po.status}</span></td>
+        <td>
+          <button class="btn btn-ghost" onclick='viewPO("${po.id}")'>View</button>
+          <button class="btn btn-ghost" onclick='editPO("${po.id}")'>Edit</button>
+          <button class="btn btn-ghost" onclick='deletePO("${po.id}")'>Delete</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    renderPagination(Math.ceil((poList.filter(po=>{
+      if(status !== 'all' && po.status !== status) return false;
+      if(supplier !== 'all' && po.supplier !== supplier) return false;
+      if(from && po.date < from) return false;
+      if(to && po.date > to) return false;
+      if(q){
+        const hay = [po.id, po.supplier, po.ref, po.date].join(' ').toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    })).length / pageSize));
+  }
+
+  function renderPagination(totalPages){
+    const cont = document.getElementById('pagination');
+    cont.innerHTML = '';
+    if(totalPages <= 1) return;
+    const prev = document.createElement('button'); prev.className='page-btn'; prev.textContent='‹ Prev';
+    prev.disabled = currentPage === 1;
+    prev.onclick = ()=>{ currentPage--; renderTable(); };
+    cont.appendChild(prev);
+
+    for(let i=1;i<=totalPages;i++){
+      const b = document.createElement('button');
+      b.className='page-btn';
+      b.textContent = i;
+      if(i===currentPage) b.style.fontWeight = '800';
+      b.onclick = ()=>{ currentPage = i; renderTable(); };
+      cont.appendChild(b);
+    }
+
+    const next = document.createElement('button'); next.className='page-btn'; next.textContent='Next ›';
+    next.disabled = currentPage === totalPages;
+    next.onclick = ()=>{ currentPage++; renderTable(); };
+    cont.appendChild(next);
+  }
+
+  /* ---------- modal: create / edit PO ---------- */
+  const modalBackdrop = document.getElementById('poModalBackdrop');
+  const lineItemsBody = document.getElementById('lineItemsBody');
+  let editingPOId = null;
+
+  function openNewModal(){
+    editingPOId = null;
+    document.getElementById('modalTitle').textContent = 'New Purchase Order';
+    document.getElementById('poNumber').value = 'PO-' + (new Date()).getFullYear() + '-' + String(Math.floor(Math.random()*900+100));
+    document.getElementById('poDate').valueAsDate = new Date();
+    document.getElementById('poSupplier').value = '';
+    document.getElementById('poRef').value = '';
+    lineItemsBody.innerHTML = '';
+    addLineItem(); // start with one
+    recalcPoTotals();
+    modalBackdrop.style.display = 'flex';
+  }
+
+  function closePoModal(){
+    modalBackdrop.style.display = 'none';
+  }
+
+  function addLineItem(item = {desc:'', qty:1, price:0, discount:0, tax:14}){
+    const id = 'li_' + Math.random().toString(36).slice(2,9);
+    const tr = document.createElement('tr');
+    tr.dataset.id = id;
+    tr.innerHTML = `
+      <td><input class="li-desc" style="width:100%;padding:6px;border-radius:6px;border:1px solid rgba(0,0,0,0.06)" value="${escapeHtml(item.desc)}"></td>
+      <td><input type="number" min="0" class="li-qty" style="width:80px;padding:6px;border-radius:6px;border:1px solid rgba(0,0,0,0.06)" value="${item.qty}"></td>
+      <td><input type="number" min="0" step="0.01" class="li-price" style="width:110px;padding:6px;border-radius:6px;border:1px solid rgba(0,0,0,0.06)" value="${item.price}"></td>
+      <td><input type="number" min="0" step="0.01" class="li-discount" style="width:90px;padding:6px;border-radius:6px;border:1px solid rgba(0,0,0,0.06)" value="${item.discount}"></td>
+      <td><input type="number" min="0" step="0.01" class="li-tax" style="width:80px;padding:6px;border-radius:6px;border:1px solid rgba(0,0,0,0.06)" value="${item.tax}"></td>
+      <td class="li-total" style="text-align:right">$0</td>
+      <td><button class="btn btn-ghost" onclick="removeLineItem(this)">✖</button></td>
+    `;
+    lineItemsBody.appendChild(tr);
+
+    // attach listeners
+    ['li-desc','li-qty','li-price','li-discount','li-tax'].forEach(cls=>{
+      tr.querySelector('.' + cls).addEventListener('input', recalcPoTotals);
+    });
+    recalcPoTotals();
+  }
+
+  function removeLineItem(btn){
+    btn.closest('tr').remove();
+    recalcPoTotals();
+  }
+
+  function recalcPoTotals(){
+    const rows = Array.from(lineItemsBody.querySelectorAll('tr'));
+    const items = rows.map(r=>{
+      const desc = r.querySelector('.li-desc').value;
+      const qty = Number(r.querySelector('.li-qty').value) || 0;
+      const price = Number(r.querySelector('.li-price').value) || 0;
+      const discount = Number(r.querySelector('.li-discount').value) || 0;
+      const tax = Number(r.querySelector('.li-tax').value) || 0;
+      const calc = (function(){
+        const before = qty * price * (1 - (discount/100));
+        const taxVal = before * (tax/100);
+        return {before:+before.toFixed(2), tax:+taxVal.toFixed(2), total:+(before + taxVal).toFixed(2)};
+      })();
+      r.querySelector('.li-total').textContent = '$' + calc.total.toLocaleString();
+      return {desc, qty, price, discount, tax};
+    });
+    const totals = sumTotals(items);
+    document.getElementById('poSubtotal').textContent = '$' + totals.subtotal.toLocaleString();
+    document.getElementById('poTaxTotal').textContent = '$' + totals.tax.toLocaleString();
+    document.getElementById('poTotal').textContent = '$' + totals.total.toLocaleString();
+    return items;
+  }
+
+  // Save PO
+  document.getElementById('savePoBtn').addEventListener('click', function(){
+    const id = document.getElementById('poNumber').value.trim() || ('PO-' + Date.now());
+    const date = document.getElementById('poDate').value || (new Date()).toISOString().slice(0,10);
+    const supplier = document.getElementById('poSupplier').value.trim() || 'Unknown Supplier';
+    const ref = document.getElementById('poRef').value.trim();
+    const items = recalcPoTotals();
+
+    // compute totals
+    const totals = sumTotals(items);
+
+    const newPO = { id, date, supplier, ref, items, totals, status:'open', created: Date.now() };
+
+    if(editingPOId){
+      // update existing
+      const idx = poList.findIndex(p=>p.id === editingPOId);
+      if(idx>=0){ poList[idx] = Object.assign({}, newPO); }
+      editingPOId = null;
+    } else {
+      poList.unshift(newPO);
+      // add supplier to list if new
+      if(!suppliers.includes(supplier)){ suppliers.unshift(supplier); }
+    }
+
+    persist();
+    renderSuppliersFilter();
+    renderTable();
+    closePoModal();
+  });
+
+  // view / edit / delete
+  function viewPO(id){
+    const po = poList.find(p=>p.id===id); if(!po) return alert('PO not found');
+    // simple view modal: reuse new modal but readonly
+    editingPOId = null;
+    document.getElementById('modalTitle').innerText = 'View Purchase Order';
+    document.getElementById('poNumber').value = po.id; document.getElementById('poNumber').disabled = true;
+    document.getElementById('poDate').value = po.date; document.getElementById('poDate').disabled = true;
+    document.getElementById('poSupplier').value = po.supplier; document.getElementById('poSupplier').disabled = true;
+    document.getElementById('poRef').value = po.ref; document.getElementById('poRef').disabled = true;
+    lineItemsBody.innerHTML = '';
+    po.items.forEach(it=>{
+      addLineItem(it);
+    });
+    // disable inputs
+    lineItemsBody.querySelectorAll('input').forEach(i=>i.disabled=true);
+    document.getElementById('savePoBtn').style.display='none';
+    modalBackdrop.style.display='flex';
+  }
+
+  function editPO(id){
+    const po = poList.find(p=>p.id===id); if(!po) return alert('PO not found');
+    editingPOId = id;
+    document.getElementById('modalTitle').innerText = 'Edit Purchase Order';
+    document.getElementById('poNumber').value = po.id; document.getElementById('poNumber').disabled = false;
+    document.getElementById('poDate').value = po.date;
+    document.getElementById('poSupplier').value = po.supplier;
+    document.getElementById('poRef').value = po.ref;
+    lineItemsBody.innerHTML = '';
+    po.items.forEach(it=> addLineItem(it) );
+    document.getElementById('savePoBtn').style.display='inline-flex';
+    modalBackdrop.style.display='flex';
+  }
+
+  function deletePO(id){
+    if(!confirm('Delete this Purchase Order?')) return;
+    poList = poList.filter(p=>p.id !== id);
+    persist(); renderTable();
+  }
+
+  /* ---------- utilities ---------- */
+  function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // simple export CSV
+  function exportPOsCSV(){
+    const rows = [['PO#','Date','Supplier','Items','Subtotal','Tax','Total','Status','Ref']];
+    poList.forEach(p=>{
+      const totals = sumTotals(p.items);
+      rows.push([p.id,p.date,p.supplier,p.items.length, totals.subtotal, totals.tax, totals.total, p.status, p.ref||'']);
+    });
+    const csv = rows.map(r=> r.map(c=> `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'purchase-orders.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function resetFilters(){ document.getElementById('filterStatus').value='all'; document.getElementById('filterSupplier').value='all'; document.getElementById('filterFrom').value=''; document.getElementById('filterTo').value=''; document.getElementById('globalSearch').value=''; currentPage=1; renderTable(); }
+
+  // open inventory action placeholder
+  function openInventory(){ alert('Open Inventory page (not implemented)'); }
+
+  // attach events
+  document.getElementById('openNewPo').addEventListener('click', openNewModal);
+  document.getElementById('globalSearch').addEventListener('input', ()=>{ currentPage=1; renderTable(); });
+  document.getElementById('filterStatus').addEventListener('change', ()=>{ currentPage=1; renderTable(); });
+  document.getElementById('filterSupplier').addEventListener('change', ()=>{ currentPage=1; renderTable(); });
+  document.getElementById('filterFrom').addEventListener('change', ()=>{ currentPage=1; renderTable(); });
+  document.getElementById('filterTo').addEventListener('change', ()=>{ currentPage=1; renderTable(); });
+
+  // initial render
+  (function init(){
+    renderSuppliersFilter();
+    renderTable();
+  })();
+
+  // close modal on backdrop click
+  modalBackdrop.addEventListener('click', e=>{
+    if(e.target === modalBackdrop) closePoModal();
+  });
+
+</script>
+</body>
+</html>

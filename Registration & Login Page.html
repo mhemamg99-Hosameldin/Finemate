@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<!--
+Advanced Registration & Login Page for Wholesale Selling
+Features:
+- Role selection: Trader (Buyer) vs Supplier
+- Company account support (Company Name, VAT/Tax ID)
+- Email/password sign-up with validation and email verification
+- Google Sign-In (requires Firebase OAuth setup)
+- Login, Forgot Password, and Email Verification flows
+- Stores user profile in Firestore collection `users` with role and profile fields
+- Optional file upload field (company registration documents) saved to Firebase Storage (comments included)
+
+Setup:
+1. Replace firebaseConfig with your project's config.
+2. Enable Email/Password and Google sign-in in Firebase Auth.
+3. Enable Firestore and (optional) Firebase Storage.
+4. Adjust Firestore security rules to protect `users` collection.
+
+Note: This is a single-file demo. For production, separate concerns, secure rules, and handle file uploads server-side if needed.
+-->
+<html lang="ar">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Wholesale - Register / Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <style>
+    :root{--bg:#f4f7fb;--card:#fff;--primary:#0055a5;--accent:#0099cc;--muted:#6b7280}
+    *{box-sizing:border-box}
+    body{font-family:Inter, Arial, sans-serif;margin:0;background:var(--bg);color:#111}
+    .center{max-width:1100px;margin:28px auto;padding:16px}
+    .grid{display:grid;grid-template-columns:1fr 420px;gap:18px}
+    @media(max-width:980px){.grid{grid-template-columns:1fr}}
+
+    .hero{background:linear-gradient(90deg,var(--primary),var(--accent));color:#fff;padding:28px;border-radius:12px}
+    .hero h1{margin:0;font-size:1.6rem}
+    .hero p{margin:8px 0 0;opacity:.95}
+
+    .card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 8px 28px rgba(2,6,23,0.06)}
+    .form-group{margin-bottom:12px}
+    label{display:block;margin-bottom:6px;font-weight:600}
+    input[type=text],input[type=email],input[type=password],select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef8}
+    .small{font-size:.86rem;color:var(--muted)}
+
+    .role-switch{display:flex;gap:8px}
+    .role-btn{flex:1;padding:10px;border-radius:8px;border:1px solid #dbeafe;background:#fff;cursor:pointer}
+    .role-btn.active{background:linear-gradient(90deg,var(--primary),var(--accent));color:#fff;border:0}
+
+    .actions{display:flex;gap:8px;margin-top:12px}
+    .btn{padding:10px 12px;border-radius:8px;border:none;cursor:pointer}
+    .btn-primary{background:var(--primary);color:#fff}
+    .btn-ghost{background:#fff;border:1px solid #e6eef8}
+
+    .divider{height:1px;background:#eef3fb;margin:12px 0}
+    .oauth{display:flex;gap:8px}
+    .oauth button{flex:1;padding:10px;border-radius:8px;border:1px solid #e6eef8;background:#fff;display:flex;align-items:center;justify-content:center;gap:8px}
+
+    .info-list{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+    .info-list li{background:linear-gradient(180deg,rgba(0,85,165,0.03),transparent);padding:10px;border-radius:8px}
+
+    .muted{color:var(--muted)}
+
+    footer{margin-top:18px;text-align:center;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="center">
+    <div class="grid">
+      <div>
+        <div class="hero card">
+          <h1>Wholesale Platform — Register or Login</h1>
+          <p>Connect small traders with suppliers directly. Create an account as a Trader or Supplier.</p>
+        </div>
+
+        <div class="card" style="margin-top:18px" id="authCard">
+          <!-- Role selection -->
+          <div class="form-group">
+            <label>Account Type</label>
+            <div class="role-switch">
+              <button class="role-btn active" id="roleTrader">Trader (Buyer)</button>
+              <button class="role-btn" id="roleSupplier">Supplier</button>
+              <button class="role-btn" id="roleCompany">Company</button>
+            </div>
+            <div class="small">Choose whether you're registering as a buyer, supplier, or company account.</div>
+          </div>
+
+          <!-- Tabs: Register / Login / Forgot -->
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button class="btn btn-primary" id="tabRegister">Register</button>
+            <button class="btn btn-ghost" id="tabLogin">Login</button>
+            <button class="btn" id="tabForgot">Forgot Password</button>
+          </div>
+
+          <!-- Register Form -->
+          <form id="registerForm">
+            <div class="form-group"><label>Full Name</label><input id="regName" type="text" required></div>
+            <div class="form-group"><label>Email</label><input id="regEmail" type="email" required></div>
+            <div class="form-group"><label>Password</label><input id="regPass" type="password" required minlength="8"></div>
+            <div class="form-group" id="companyFields" style="display:none">
+              <label>Company Name</label><input id="regCompany" type="text">
+              <label style="margin-top:8px">VAT / Tax ID (optional)</label><input id="regTax" type="text">
+              <label style="margin-top:8px">Company Registration Document (optional)</label>
+              <input id="regDoc" type="file" accept="application/pdf,image/*">
+              <div class="small">If you register as a company or supplier, uploading registration docs speeds up verification.</div>
+            </div>
+            <div class="form-group"><label>Phone (optional)</label><input id="regPhone" type="text"></div>
+            <div><input id="agree" type="checkbox"> <label class="small">I agree to Terms & Conditions and Privacy Policy</label></div>
+            <div class="actions"><button class="btn btn-primary" type="submit">Create Account</button><button class="btn" type="button" id="regCancel">Cancel</button></div>
+          </form>
+
+          <!-- Login Form -->
+          <form id="loginForm" style="display:none">
+            <div class="form-group"><label>Email</label><input id="loginEmail" type="email" required></div>
+            <div class="form-group"><label>Password</label><input id="loginPass" type="password" required></div>
+            <div class="actions"><button class="btn btn-primary" type="submit">Login</button><button class="btn" type="button" id="loginCancel">Cancel</button></div>
+            <div style="margin-top:8px" class="oauth">
+              <button id="googleSign">Sign in with Google</button>
+            </div>
+          </form>
+
+          <!-- Forgot Password -->
+          <form id="forgotForm" style="display:none">
+            <div class="form-group"><label>Enter your email</label><input id="forgotEmail" type="email" required></div>
+            <div class="actions"><button class="btn btn-primary" type="submit">Send Reset Link</button><button class="btn" type="button" id="forgotCancel">Cancel</button></div>
+          </form>
+
+          <div class="divider"></div>
+          <div id="messages" class="small muted"></div>
+        </div>
+
+      </div>
+
+      <aside>
+        <div class="card">
+          <h3>Why Register?</h3>
+          <ul class="info-list">
+            <li><strong>Traders:</strong> Access wholesale pricing, request quotes, bulk cart.</li>
+            <li><strong>Suppliers:</strong> List products, manage orders, reach new buyers.</li>
+            <li><strong>Companies:</strong> Verified badge, easier large orders, invoicing.</li>
+          </ul>
+          <div style="margin-top:12px" class="small muted">After registration, you'll receive an email verification link. Some supplier features require document verification.</div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h4>Tips</h4>
+          <ol class="small muted">
+            <li>Use a business email for supplier accounts.</li>
+            <li>Upload company docs to speed verification.</li>
+            <li>Enable 2FA later from your account settings.</li>
+          </ol>
+        </div>
+      </aside>
+    </div>
+    <footer>© <span id="yr"></span> FinMate — Accounting for Manufacturers</footer>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+  <script>
+    // ================= CONFIGURE FIREBASE =================
+    const firebaseConfig = {
+      apiKey: "REPLACE_API_KEY",
+      authDomain: "REPLACE_PROJECT.firebaseapp.com",
+      projectId: "REPLACE_PROJECT",
+      storageBucket: "REPLACE_PROJECT.appspot.com",
+      messagingSenderId: "...",
+      appId: "..."
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+    // ======================================================
+
+    // Elements and state
+    const roleTrader = document.getElementById('roleTrader');
+    const roleSupplier = document.getElementById('roleSupplier');
+    const roleCompany = document.getElementById('roleCompany');
+    const tabRegister = document.getElementById('tabRegister');
+    const tabLogin = document.getElementById('tabLogin');
+    const tabForgot = document.getElementById('tabForgot');
+    const registerForm = document.getElementById('registerForm');
+    const loginForm = document.getElementById('loginForm');
+    const forgotForm = document.getElementById('forgotForm');
+    const companyFields = document.getElementById('companyFields');
+    const messages = document.getElementById('messages');
+
+    let selectedRole = 'trader';
+    document.getElementById('yr').textContent = new Date().getFullYear();
+
+    function setRole(role){ selectedRole = role; roleTrader.classList.toggle('active', role==='trader'); roleSupplier.classList.toggle('active', role==='supplier'); roleCompany.classList.toggle('active', role==='company'); companyFields.style.display = (role==='supplier' || role==='company') ? 'block' : 'none'; }
+    roleTrader.addEventListener('click', ()=>setRole('trader'));
+    roleSupplier.addEventListener('click', ()=>setRole('supplier'));
+    roleCompany.addEventListener('click', ()=>setRole('company'));
+
+    tabRegister.addEventListener('click', ()=>{ registerForm.style.display='block'; loginForm.style.display='none'; forgotForm.style.display='none'; });
+    tabLogin.addEventListener('click', ()=>{ registerForm.style.display='none'; loginForm.style.display='block'; forgotForm.style.display='none'; });
+    tabForgot.addEventListener('click', ()=>{ registerForm.style.display='none'; loginForm.style.display='none'; forgotForm.style.display='block'; });
+
+    // Helper
+    function showMsg(txt, isError=false){ messages.style.color = isError ? 'crimson' : 'green'; messages.textContent = txt; setTimeout(()=>{ messages.textContent=''; }, 7000); }
+
+    // Registration flow
+    registerForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const name = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const pass = document.getElementById('regPass').value;
+      const company = document.getElementById('regCompany').value.trim();
+      const tax = document.getElementById('regTax').value.trim();
+      const phone = document.getElementById('regPhone').value.trim();
+      const docFile = document.getElementById('regDoc').files[0];
+
+      if(!name || !email || !pass){ showMsg('Please fill required fields', true); return; }
+      if(pass.length < 8){ showMsg('Password must be at least 8 characters', true); return; }
+      if(!document.getElementById('agree').checked){ showMsg('You must agree to Terms & Conditions', true); return; }
+
+      try{
+        const userCred = await auth.createUserWithEmailAndPassword(email, pass);
+        const uid = userCred.user.uid;
+        // send email verification
+        await userCred.user.sendEmailVerification();
+
+        // optionally upload doc to Storage
+        let docUrl = '';
+        if(docFile){
+          const ref = storage.ref().child(`company_docs/${uid}/${docFile.name}`);
+          await ref.put(docFile);
+          docUrl = await ref.getDownloadURL();
+        }
+
+        // save profile in Firestore
+        await db.collection('users').doc(uid).set({
+          name, email, phone, role: selectedRole, company: company || null, taxId: tax || null, docUrl, createdAt: firebase.firestore.FieldValue.serverTimestamp(), verified: false
+        });
+
+        showMsg('Account created. Verification email sent — check your inbox.');
+        registerForm.reset();
+      }catch(err){ console.error(err); showMsg(err.message || 'Error creating account', true); }
+    });
+
+    // Login flow
+    loginForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value.trim();
+      const pass = document.getElementById('loginPass').value;
+      try{
+        const res = await auth.signInWithEmailAndPassword(email, pass);
+        if(!res.user.emailVerified){ showMsg('Please verify your email before using supplier features', true); }
+        else{ showMsg('Logged in successfully');
+          // redirect to dashboard based on role
+          const doc = await db.collection('users').doc(res.user.uid).get();
+          if(doc.exists){ const role = doc.data().role || 'trader'; window.location.href = role==='supplier' ? '/supplier-dashboard.html' : '/trader-dashboard.html'; }
+        }
+      }catch(err){ showMsg(err.message, true); }
+    });
+
+    // Forgot password
+    forgotForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const email = document.getElementById('forgotEmail').value.trim();
+      try{ await auth.sendPasswordResetEmail(email); showMsg('Password reset link sent to your email'); forgotForm.reset(); }
+      catch(err){ showMsg(err.message, true); }
+    });
+
+    // Google Auth (requires OAuth configured in Firebase Console)
+    document.getElementById('googleSign').addEventListener('click', async ()=>{
+      try{
+        const provider = new firebase.auth.GoogleAuthProvider();
+        const res = await auth.signInWithPopup(provider);
+        const user = res.user;
+        // If new user, store profile in Firestore
+        const userRef = db.collection('users').doc(user.uid);
+        const snap = await userRef.get();
+        if(!snap.exists){
+          await userRef.set({ name: user.displayName || null, email: user.email, role: selectedRole, company: null, createdAt: firebase.firestore.FieldValue.serverTimestamp(), verified: user.emailVerified });
+        }
+        showMsg('Signed in with Google');
+      }catch(err){ console.error(err); showMsg(err.message, true); }
+    });
+
+    // Observe auth state to update UI (simple)
+    auth.onAuthStateChanged(async user=>{
+      if(user){
+        const prof = await db.collection('users').doc(user.uid).get().catch(()=>null);
+        console.log('User logged in', user.uid, prof && prof.data());
+      }
+    });
+
+  </script>
+</body>
+</html> 

@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Audit Logs</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Firebase (compat SDK for simpler usage here) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <style>
+    :root{
+      --blue-900:#0b3d91; --blue-700:#1464c9; --blue-500:#2a9df4;
+      --bg:#f4f7fb; --panel:#fff; --muted:#6b7280;
+    }
+    [data-theme="dark"]{
+      --bg:#071026; --panel:#0f1724; --muted:#9ca3af;
+      --blue-900:#071733; --blue-700:#0a3a6b; --blue-500:#1f6fb3;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
+      background:linear-gradient(180deg,var(--bg), #e9f2ff 320px);
+      color:#071135; transition:background .25s,color .25s;
+    }
+    [data-theme="dark"] body{ color:#e6eef8; }
+
+    .app{display:flex;min-height:100vh;--sidebar-w:260px;}
+
+    /* Sidebar */
+    aside.sidebar{
+      width:var(--sidebar-w); background:linear-gradient(180deg,var(--blue-900),var(--blue-700));
+      color:#fff; padding:20px; display:flex;flex-direction:column; gap:12px; position:fixed;left:0;top:0;bottom:0;
+      box-shadow:0 6px 24px rgba(10,25,60,0.12);
+    }
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700}
+    .brand i{font-size:1.25rem}
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+    /* Main */
+    main.main{margin-left:var(--sidebar-w);padding:24px;width:calc(100% - var(--sidebar-w));transition:width .3s}
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px}
+    .search{flex:1;max-width:540px;display:flex;gap:8px;align-items:center}
+    .search input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(15,23,42,0.06);background:var(--panel);box-shadow:0 2px 8px rgba(11,18,32,0.04)}
+    .controls{display:flex;gap:10px;align-items:center}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;cursor:pointer;border:none;font-weight:600}
+    .btn-primary{background:linear-gradient(90deg,var(--blue-700),var(--blue-500));color:#fff;box-shadow:0 8px 18px rgba(42,157,244,0.14)}
+    .btn-ghost{background:transparent;border:1px solid rgba(15,23,42,0.06);color:var(--muted)}
+    .icon-btn{background:var(--panel);padding:8px;border-radius:10px;border:1px solid rgba(15,23,42,0.05)}
+
+    /* grid */
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px;align-items:start}
+    .card{background:var(--panel);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(16,24,40,0.04);transition:transform .28s;overflow:hidden}
+    .card:hover{transform:translateY(-6px)}
+    .stat{grid-column:span 3;display:flex;gap:12px;align-items:center}
+    .badge{width:54px;height:54px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--blue-500),var(--blue-700));color:#fff;font-size:1.25rem;box-shadow:0 6px 18px rgba(42,157,244,0.12)}
+    .stat h4{margin:0;font-size:1.05rem}
+    .stat p{margin:0;color:var(--muted);font-size:.9rem}
+
+    .logs{grid-column:span 8;min-height:360px}
+    .side-panel{grid-column:span 4;min-height:360px}
+
+    table{width:100%;border-collapse:collapse;font-size:.95rem}
+    thead th{text-align:left;color:var(--muted);font-weight:700;padding:10px 8px;font-size:.86rem}
+    tbody tr{transition:background .18s,transform .18s;border-bottom:1px solid rgba(0,0,0,0.04)}
+    tbody tr:hover{background:linear-gradient(90deg,rgba(42,157,244,0.03),rgba(10,25,60,0.02));transform:translateX(4px)}
+    td{padding:12px 8px;vertical-align:middle}
+
+    .filter-row{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+    .pill{padding:6px 10px;border-radius:999px;background:#eef6ff;color:var(--blue-700);font-weight:700;border:1px solid rgba(42,157,244,0.08)}
+
+    .muted{color:var(--muted)}
+
+    .page-footer{text-align:center;padding:22px 0;color:var(--muted);grid-column:1/-1}
+
+    @media(max-width:1100px){
+      :root{--sidebar-w:72px}
+      aside.sidebar{width:var(--sidebar-w);padding:12px}
+      .brand span{display:none}
+      main.main{margin-left:var(--sidebar-w)}
+      .stat{grid-column:span 6}
+      .logs{grid-column:span 12}
+      .side-panel{grid-column:span 12}
+    }
+
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="app" id="app">
+
+   <!-- SIDEBAR -->
+   <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+      <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+      <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+      <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+    
+
+    <div class="sidebar-footer">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-circle-info"></i></div>
+        <div>
+          <div style="font-weight:700">Factory #12</div>
+          <div style="font-size:.85rem;opacity:.9">Plan: Enterprise</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main" role="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2 style="margin:0">Audit Logs</h2>
+        <div style="color:var(--muted)">Real-time activity & system audit trail</div>
+      </div>
+
+      <div class="controls">
+        <div class="search">
+          <input id="globalSearch" placeholder="Search by user, ref, action, entity..." />
+        </div>
+        <button id="themeToggle" class="btn icon-btn" title="Toggle theme"><i class="fa-regular fa-moon"></i></button>
+        <button id="exportCSV" class="btn btn-ghost">Export CSV</button>
+        <button id="clearLogs" class="btn btn-ghost" title="Clear logs (danger)">Clear Logs</button>
+      </div>
+    </div>
+
+    <section class="grid">
+      <!-- Stats -->
+      <div class="stat card">
+        <div class="badge"><i class="fa-solid fa-list"></i></div>
+        <div>
+          <h4 id="totalLogs">0</h4>
+          <p>Total Logs</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#34d399,#10b981)"><i class="fa-solid fa-check"></i></div>
+        <div>
+          <h4 id="successLogs">0</h4>
+          <p>Successful</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#ef4444,#f97316)"><i class="fa-solid fa-xmark"></i></div>
+        <div>
+          <h4 id="failedLogs">0</h4>
+          <p>Failed</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)"><i class="fa-solid fa-clock"></i></div>
+        <div>
+          <h4 id="lastAction">—</h4>
+          <p>Last Action</p>
+        </div>
+      </div>
+
+      <!-- Logs table -->
+      <div class="logs card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+          <div>
+            <strong>Recent Audit Entries</strong>
+            <div class="muted" style="font-size:.95rem">Live feed from Firestore collection <code>audit_logs</code></div>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="typeFilter" class="btn btn-ghost" title="Filter type">
+              <option value="all">All Types</option>
+              <option value="auth">Auth</option>
+              <option value="invoice">Invoice</option>
+              <option value="inventory">Inventory</option>
+              <option value="system">System</option>
+            </select>
+            <select id="statusFilter" class="btn btn-ghost" title="Status">
+              <option value="all">All Status</option>
+              <option value="success">Success</option>
+              <option value="failed">Failed</option>
+            </select>
+            <button id="refreshBtn" class="btn btn-ghost">Refresh</button>
+          </div>
+        </div>
+
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:150px">Timestamp</th>
+                <th style="width:120px">User</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Status</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="logsBody">
+              <!-- populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Side panel -->
+      <div class="side-panel card">
+        <strong>Quick Insights</strong>
+        <div class="muted" style="font-size:.92rem;margin-bottom:10px">Filters & utilities</div>
+
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+          <div>
+            <label class="muted">Show only recent (24h)</label>
+            <div><button id="last24Btn" class="btn btn-ghost">Last 24 hours</button></div>
+          </div>
+
+          <div>
+            <label class="muted">Export</label>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <button id="exportCSV2" class="btn btn-primary">Export CSV</button>
+              <button id="exportJSON" class="btn btn-ghost">Export JSON</button>
+            </div>
+          </div>
+
+          <div>
+            <label class="muted">Add demo log</label>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <button id="addDemo" class="btn btn-ghost">Add Demo</button>
+            </div>
+          </div>
+
+          <div style="margin-top:12px">
+            <label class="muted">Realtime status</label>
+            <div style="margin-top:6px"><span id="realtimeStatus" class="pill">Connected</span></div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="page-footer">© 2025 BlueFactory — Audit Logs</div>
+    </section>
+  </main>
+</div>
+
+<script>
+  /*******************************
+   *  Replace with your Firebase config
+   *******************************/
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT",
+    // ...rest of config
+  };
+
+  // Initialize Firebase (compat)
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // DOM refs
+  const logsBody = document.getElementById('logsBody');
+  const totalLogsEl = document.getElementById('totalLogs');
+  const successLogsEl = document.getElementById('successLogs');
+  const failedLogsEl = document.getElementById('failedLogs');
+  const lastActionEl = document.getElementById('lastAction');
+  const realtimeStatusEl = document.getElementById('realtimeStatus');
+
+  const globalSearch = document.getElementById('globalSearch');
+  const typeFilter = document.getElementById('typeFilter');
+  const statusFilter = document.getElementById('statusFilter');
+
+  let unsubscribe = null;
+  let cache = []; // local cache of logs
+
+  // utility: format timestamp (Firestore timestamp or ISO)
+  function fmtDate(ts){
+    if(!ts) return '-';
+    try {
+      const d = ts.toDate ? ts.toDate() : new Date(ts);
+      return d.toLocaleString();
+    } catch(e){ return String(ts); }
+  }
+
+  // render table rows
+  function renderRows(list){
+    logsBody.innerHTML = '';
+    if(!list.length){
+      logsBody.innerHTML = '<tr><td colspan="6" class="muted">No logs to show</td></tr>';
+      return;
+    }
+    list.forEach(doc=>{
+      const tr = document.createElement('tr');
+      const statusColor = (doc.status === 'success') ? '#0b6623' : (doc.status === 'failed' ? '#b91c1c' : '#666');
+      tr.innerHTML = `
+        <td>${fmtDate(doc.timestamp)}</td>
+        <td>${doc.user || '—'}</td>
+        <td style="text-transform:capitalize">${doc.action || '—'}</td>
+        <td>${doc.entity || '—'}</td>
+        <td style="color:${statusColor};font-weight:700;text-transform:capitalize">${doc.status || '—'}</td>
+        <td style="max-width:340px;white-space:pre-wrap">${doc.details ? escapeHtml(JSON.stringify(doc.details)) : (doc.message || '-')}</td>
+      `;
+      logsBody.appendChild(tr);
+    });
+  }
+
+  // escape small html
+  function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // compute stats and render
+  function computeStats(list){
+    totalLogsEl.textContent = list.length;
+    const success = list.filter(l=>l.status==='success').length;
+    const failed = list.filter(l=>l.status==='failed').length;
+    successLogsEl.textContent = success;
+    failedLogsEl.textContent = failed;
+    lastActionEl.textContent = list[0] ? `${list[0].action} — ${list[0].user || 'system'}` : '—';
+  }
+
+  // apply filters and search over cache
+  function applyFilters(){
+    const q = globalSearch.value.trim().toLowerCase();
+    const type = typeFilter.value;
+    const status = statusFilter.value;
+    let filtered = cache.slice();
+
+    if(type && type !== 'all') filtered = filtered.filter(x => (x.type||'').toLowerCase() === type.toLowerCase());
+    if(status && status !== 'all') filtered = filtered.filter(x => (x.status||'').toLowerCase() === status.toLowerCase());
+    if(q){
+      filtered = filtered.filter(x => {
+        const hay = `${x.user||''} ${x.action||''} ${x.entity||''} ${JSON.stringify(x.details||'')}`.toLowerCase();
+        return hay.indexOf(q) !== -1;
+      });
+    }
+    renderRows(filtered);
+    computeStats(filtered);
+  }
+
+  // setup Firestore snapshot listener (real-time)
+  function startRealtime(){
+    realtimeStatusEl.textContent = 'Connecting...';
+    if(unsubscribe) unsubscribe();
+    unsubscribe = db.collection('audit_logs')
+      .orderBy('timestamp', 'desc')
+      .limit(200)
+      .onSnapshot(snap => {
+        realtimeStatusEl.textContent = 'Connected';
+        const arr = [];
+        snap.forEach(doc => {
+          const data = doc.data();
+          arr.push({
+            id: doc.id,
+            user: data.user,
+            action: data.action,
+            entity: data.entity,
+            status: data.status,
+            details: data.details,
+            message: data.message,
+            type: data.type,
+            timestamp: data.timestamp || data.createdAt || null
+          });
+        });
+        cache = arr;
+        applyFilters();
+      }, err => {
+        realtimeStatusEl.textContent = 'Error';
+        console.error('snapshot error', err);
+      });
+  }
+
+  // add demo log (writes to Firestore)
+  async function addDemoLog(){
+    try{
+      await db.collection('audit_logs').add({
+        user: 'demo.user@bluefactory',
+        action: 'create_invoice',
+        entity: 'invoice:INV-3001',
+        status: Math.random() > 0.2 ? 'success' : 'failed',
+        details: {amount: Math.round(Math.random()*10000), note: 'Demo entry'},
+        type: 'invoice',
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      alert('Demo log added');
+    }catch(e){ alert('Error adding demo: '+e.message) }
+  }
+
+  // export CSV from current cache (filtered view)
+  function exportCSV(list = null){
+    const rows = [['Timestamp','User','Action','Entity','Status','Details']];
+    const data = list || cache;
+    data.forEach(r => rows.push([fmtDate(r.timestamp), r.user||'', r.action||'', r.entity||'', r.status||'', JSON.stringify(r.details||r.message||'')]));
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'audit_logs_export.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // export JSON
+  function exportJSON(list = null){
+    const data = list || cache;
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'audit_logs_export.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // clear recent logs (dangerous) - deletes up to 200 shown items
+  async function clearLogs(){
+    if(!confirm('Are you sure? This will DELETE the visible logs (up to latest 200).')) return;
+    try{
+      const snap = await db.collection('audit_logs').orderBy('timestamp','desc').limit(200).get();
+      const batch = db.batch();
+      snap.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      alert('Deleted visible logs (up to 200).');
+    }catch(e){ alert('Error clearing logs: '+e.message) }
+  }
+
+  // simple helper: only recent 24 hours
+  function filter24(){
+    const cutoff = Date.now() - (24*3600*1000);
+    const filtered = cache.filter(r => {
+      try{
+        const t = r.timestamp && r.timestamp.toDate ? r.timestamp.toDate().getTime() : new Date(r.timestamp).getTime();
+        return t >= cutoff;
+      }catch(e){ return false; }
+    });
+    renderRows(filtered);
+    computeStats(filtered);
+  }
+
+  // small UI hooks
+  document.getElementById('addDemo').addEventListener('click', addDemoLog);
+  document.getElementById('exportCSV').addEventListener('click', ()=> exportCSV());
+  document.getElementById('exportCSV2').addEventListener('click', ()=> exportCSV());
+  document.getElementById('exportJSON').addEventListener('click', ()=> exportJSON());
+  document.getElementById('refreshBtn').addEventListener('click', ()=> applyFilters());
+  document.getElementById('clearLogs').addEventListener('click', clearLogs);
+  document.getElementById('last24Btn').addEventListener('click', filter24);
+
+  // filters & search events
+  globalSearch.addEventListener('input', ()=> applyFilters());
+  typeFilter.addEventListener('change', ()=> applyFilters());
+  statusFilter.addEventListener('change', ()=> applyFilters());
+
+  // theme toggle
+  const themeToggle = document.getElementById('themeToggle');
+  (function loadTheme(){
+    const saved = localStorage.getItem('bf_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+    themeToggle.innerHTML = saved === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  })();
+  themeToggle.addEventListener('click', () => {
+    const curr = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = curr === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('bf_theme', next);
+    themeToggle.innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  });
+
+  // listen for real-time logs
+  startRealtime();
+
+</script>
+</body>
+</html>

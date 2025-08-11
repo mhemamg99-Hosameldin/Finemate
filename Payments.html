@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Payments</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <!-- Libraries for export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Firebase (v9 modular) -->
+  <script type="module">
+    // We'll import firebase in the main script section to allow using type="module"
+  </script>
+
+  <style>
+    :root{
+      --blue-900: #0b3d91;
+      --blue-700: #1464c9;
+      --panel: #ffffff;
+      --bg: #f4f7fb;
+      --muted: #6b7280;
+      --card-radius: 12px;
+    }
+    [data-theme="dark"]{
+      --bg: #0f1724;
+      --panel: #0f1724;
+      --muted: #9ca3af;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg), #e9f2ff 320px);
+      color: #0b1220;
+      min-height:100vh;
+    }
+
+    .app{ display:flex; min-height:100vh; }
+
+    /* Sidebar */
+    .sidebar{
+      width:260px;
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color: #fff;
+      padding:18px;
+      display:flex; flex-direction:column; gap:18px;
+      position:fixed; left:0; top:0; bottom:0;
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem }
+     /* Sidebar */
+     .sidebar{
+      width:var(--sidebar-w);
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color: #fff;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      position:fixed;
+      left:0; top:0; bottom:0;
+      box-shadow: 0 6px 24px rgba(10,25,60,0.12);
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem; color: #fff; transform:translateY(-1px) }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+    /* Main */
+    .main{ margin-left:260px; padding:24px; width:calc(100% - 260px) }
+
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+    .controls{ display:flex; gap:10px; align-items:center; }
+
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:8px; cursor:pointer; border:none; font-weight:600; }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-900)); color:#fff; box-shadow: 0 8px 18px rgba(42,157,244,0.12); }
+    .btn-ghost{ background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted); }
+    .icon-btn{ background:var(--panel); padding:8px; border-radius:8px; border:1px solid rgba(15,23,42,0.05) }
+
+    .card{ background:var(--panel); border-radius:var(--card-radius); padding:16px; box-shadow: 0 6px 20px rgba(16,24,40,0.04); }
+    .card:hover{ transform:translateY(-4px) }
+
+    .filters{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+    .filters input, .filters select{ padding:8px 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.08); }
+
+    table{ width:100%; border-collapse:collapse; font-size:.95rem; }
+    thead th{ text-align:left; color:var(--muted); font-weight:700; padding:10px 6px; font-size:.85rem; }
+    tbody tr{ transition: background .18s, transform .18s; border-bottom:1px solid rgba(0,0,0,0.04); }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform:translateX(4px); }
+    td{ padding:10px 6px; vertical-align:middle }
+
+    .table-actions button{ margin-right:6px }
+
+    /* modals */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:9999 }
+    .modal{ background:var(--panel); padding:18px; border-radius:10px; width:720px; max-width:95%; max-height:90vh; overflow:auto; box-shadow:0 20px 50px rgba(0,0,0,0.2) }
+    .modal h3{ margin-top:0 }
+
+    /* responsive */
+    @media (max-width:1100px){
+      .sidebar{ width:72px; padding:12px }
+      .brand span{ display:none }
+      .main{ margin-left:72px; width:calc(100% - 72px); padding:14px }
+    }
+    @media (max-width:720px){
+      .filters{ flex-direction:column; align-items:stretch }
+      .topbar{ flex-direction:column; align-items:stretch }
+      .controls{ justify-content:flex-end }
+    }
+
+    .page-footer{ text-align:center; padding:18px 0; color:var(--muted); margin-top:20px }
+  </style>
+</head>
+<body data-theme="light">
+
+  <div class="app" id="app">
+
+   
+      <!-- SIDEBAR -->
+   <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i> <span>BlueFactory</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link"><i class="fa-solid fa-grid"></i> <span>Dashboard</span></a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> <span>Invoices</span></a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> <span>Inventory</span></a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> <span>Reports</span></a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-users"></i> <span>Suppliers</span></a>
+      <a href="customers.html" class="nav-link"><i class="fa-solid fa-handshake"></i> <span>Customers</span></a>
+      <a href="Chart of Accounts.html" class="nav-link active"><i class="fa-solid fa-sitemap"></i> <span>Chart of Accounts</span></a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-book"></i> <span>Journal Entries</span></a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-cart-plus"></i> <span>Purchase Orders</span></a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-lines"></i> <span>Sales Orders</span></a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-credit-card"></i> <span>Payments</span></a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> <span>Payroll</span></a>
+      <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> <span>Tax Management</span></a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building"></i> <span>Assets Management</span></a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> <span>Audit Logs</span></a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> <span>Multi-Currency</span></a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> <span>Notifications Center</span></a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> <span>Settings</span></a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="small-badge"><i class="fa-solid fa-circle-info"></i></div>
+      <div>
+        <div style="font-weight:700">Factory #12</div>
+        <div style="font-size:.85rem;opacity:.95">Enterprise plan</div>
+      </div>
+    </div>
+  </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <!-- Topbar -->
+      <div class="topbar">
+        <div style="display:flex;align-items:center;gap:12px">
+          <h2 style="margin:0">Payments</h2>
+          <div style="color:var(--muted)">Manage payments — create, track, export</div>
+        </div>
+
+        <div class="controls">
+          <div style="display:flex;gap:8px;align-items:center" class="filters">
+            <input id="searchInput" placeholder="Search by customer, reference..." style="min-width:220px" />
+            <select id="statusFilter">
+              <option value="all">All statuses</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="overdue">Overdue</option>
+            </select>
+            <input type="date" id="dateFrom" />
+            <input type="date" id="dateTo" />
+            <select id="customerFilter"><option value="all">All customers</option></select>
+          </div>
+
+          <button class="btn icon-btn" title="Refresh" onclick="fetchPayments()"><i class="fa-solid fa-arrows-rotate"></i></button>
+          <button class="btn icon-btn" id="themeToggle" title="Toggle theme"><i class="fa-regular fa-moon"></i></button>
+          <button class="btn btn-primary" id="addPaymentBtn"><i class="fa-solid fa-plus"></i> New Payment</button>
+        </div>
+      </div>
+
+      <!-- Controls row -->
+      <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost" onclick="exportCSV()">Export CSV</button>
+          <button class="btn btn-ghost" onclick="exportExcel()">Export Excel</button>
+          <button class="btn btn-ghost" onclick="exportPDF()">Export PDF</button>
+        </div>
+        <div style="color:var(--muted)"><small id="countInfo">0 payments</small></div>
+      </div>
+
+      <!-- Table card -->
+      <div class="card">
+        <table id="paymentsTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Reference</th>
+              <th>Customer</th>
+              <th>Method</th>
+              <th>Debit</th>
+              <th>Credit</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="paymentsBody">
+            <!-- JS fills this -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="page-footer">© 2025 BlueFactory — Accounting for Manufacturers</div>
+    </main>
+
+  </div>
+
+  <!-- Modal templates -->
+  <div id="modalRoot" style="display:none"></div>
+
+  <!-- Firebase + App script -->
+  <script type="module">
+    // import firebase modules
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, getDocs, onSnapshot, query, where,
+      doc, updateDoc, deleteDoc, orderBy, limit
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+    // ====== CONFIG: replace with your Firebase project config ======
+    const FIREBASE_CONFIG = {
+      // apiKey: "...",
+      // authDomain: "...",
+      // projectId: "...",
+      // storageBucket: "...",
+      // messagingSenderId: "...",
+      // appId: "..."
+    };
+    // ================================================================
+
+    // init firebase
+    const app = initializeApp(FIREBASE_CONFIG);
+    const db = getFirestore(app);
+
+    /* ======== Local UI Helpers and state ======== */
+    const paymentsBody = document.getElementById('paymentsBody');
+    const countInfo = document.getElementById('countInfo');
+    const customerFilter = document.getElementById('customerFilter');
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const dateFrom = document.getElementById('dateFrom');
+    const dateTo = document.getElementById('dateTo');
+
+    let payments = []; // local cache
+    let customersSet = new Set();
+
+    // Theme persistence
+    const themeToggle = document.getElementById('themeToggle');
+    (function loadTheme(){
+      const saved = localStorage.getItem('bf_theme') || 'light';
+      document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+      themeToggle.innerHTML = saved === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+    })();
+    themeToggle.addEventListener('click', ()=> {
+      const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      const next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('bf_theme', next);
+      themeToggle.innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+    });
+
+    // Show a modal (simple)
+    function showModal(innerHTML){
+      const root = document.getElementById('modalRoot');
+      root.style.display = 'block';
+      root.innerHTML = `<div class="modal-backdrop" id="modalBackdrop">
+        <div class="modal">${innerHTML}</div>
+      </div>`;
+      document.getElementById('modalBackdrop').addEventListener('click', (e)=>{
+        if(e.target.id === 'modalBackdrop') closeModal();
+      });
+    }
+    function closeModal(){ document.getElementById('modalRoot').style.display='none'; document.getElementById('modalRoot').innerHTML=''; }
+
+    /* ======= Firestore integration (realtime) ======= */
+    const paymentsCol = collection(db, 'payments');
+
+    // Realtime listener: updates local payments array automatically
+    function subscribePaymentsRealtime(){
+      // Listen to last 500 records (you can add ordering/pagination)
+      const q = query(paymentsCol, orderBy('date','desc'), limit(500));
+      onSnapshot(q, snapshot=>{
+        payments = [];
+        customersSet.clear();
+        snapshot.forEach(docSnap => {
+          const d = docSnap.data();
+          d.id = docSnap.id;
+          payments.push(d);
+          if(d.customer) customersSet.add(d.customer);
+        });
+        renderPayments();
+        renderCustomersFilter();
+      }, err=> {
+        console.error('Firestore snapshot error:', err);
+      });
+    }
+
+    // Initial subscription
+    subscribePaymentsRealtime();
+
+    // Create a new payment doc
+    async function createPayment(data){
+      try{
+        const docRef = await addDoc(paymentsCol, data);
+        console.log('Payment created', docRef.id);
+        closeModal();
+      }catch(err){
+        console.error(err); alert('Error creating payment: '+err.message);
+      }
+    }
+
+    async function updatePayment(id, data){
+      try{
+        await updateDoc(doc(db, 'payments', id), data);
+        closeModal();
+      }catch(err){
+        console.error(err); alert('Error updating payment: '+err.message);
+      }
+    }
+
+    async function removePayment(id){
+      if(!confirm('Delete this payment?')) return;
+      try{
+        await deleteDoc(doc(db, 'payments', id));
+      }catch(err){
+        console.error(err); alert('Delete failed: '+err.message);
+      }
+    }
+
+    /* ======= UI: rendering & actions ======= */
+    function renderCustomersFilter(){
+      // populate customerFilter select with customers found
+      customerFilter.innerHTML = '<option value="all">All customers</option>';
+      const arr = Array.from(customersSet).sort();
+      arr.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c;
+        customerFilter.appendChild(opt);
+      });
+    }
+
+    function formatMoney(v){ return v==null || v===0 ? '-' : '$'+Number(v).toLocaleString(); }
+    function formatDate(iso){ if(!iso) return '-'; const d = new Date(iso); return d.toLocaleDateString(); }
+
+    function renderPayments(){
+      // apply filters
+      const q = (searchInput.value||'').toLowerCase();
+      const status = statusFilter.value;
+      const cust = customerFilter.value;
+      const from = dateFrom.value ? new Date(dateFrom.value) : null;
+      const to = dateTo.value ? new Date(dateTo.value) : null;
+      let filtered = payments.filter(p=>{
+        if(status !== 'all' && p.status !== status) return false;
+        if(cust !== 'all' && p.customer !== cust) return false;
+        if(q){
+          if(!([p.reference, p.customer, p.method, p.notes].join(' ').toLowerCase().includes(q))) return false;
+        }
+        if(from && new Date(p.date) < from) return false;
+        if(to && new Date(p.date) > new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23,59,59)) return false;
+        return true;
+      });
+
+      paymentsBody.innerHTML = '';
+      filtered.forEach(p=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${formatDate(p.date)}</td>
+          <td>${p.reference||'-'}</td>
+          <td>${p.customer||'-'}</td>
+          <td>${p.method||'-'}</td>
+          <td style="color:${p.debit? '#0b6623':'#666'}">${formatMoney(p.debit)}</td>
+          <td style="color:${p.credit? '#b91c1c':'#666'}">${formatMoney(p.credit)}</td>
+          <td style="text-transform:capitalize">${p.status || 'pending'}</td>
+          <td class="table-actions">
+            <button class="btn btn-ghost" onclick="viewPayment('${p.id}')"><i class="fa-regular fa-eye"></i></button>
+            <button class="btn btn-ghost" onclick="editPayment('${p.id}')"><i class="fa-regular fa-pen-to-square"></i></button>
+            <button class="btn btn-ghost" onclick="removePayment('${p.id}')"><i class="fa-regular fa-trash-alt"></i></button>
+          </td>
+        `;
+        paymentsBody.appendChild(tr);
+      });
+
+      countInfo.textContent = `${filtered.length} payment(s)`;
+    }
+
+    // fetchPayments (manual refresh) — we keep realtime listener, so this may be optional
+    async function fetchPayments(){
+      try{
+        const snaps = await getDocs(query(paymentsCol, orderBy('date','desc'), limit(500)));
+        payments = [];
+        customersSet.clear();
+        snaps.forEach(s=>{
+          const d = s.data(); d.id = s.id;
+          payments.push(d);
+          if(d.customer) customersSet.add(d.customer);
+        });
+        renderPayments(); renderCustomersFilter();
+      }catch(err){ console.error(err); alert('Failed to fetch payments: '+err.message) }
+    }
+
+    /* ======= Add Payment modal ======= */
+    document.getElementById('addPaymentBtn').addEventListener('click', ()=> {
+      showAddPaymentModal();
+    });
+
+    function showAddPaymentModal(){
+      const html = `
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3>New Payment</h3>
+          <button class="btn btn-ghost" onclick="closeModal()"><i class="fa-regular fa-xmark"></i></button>
+        </div>
+        <form id="paymentForm" style="margin-top:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr; gap:10px">
+            <div>
+              <label>Date</label>
+              <input type="date" id="p_date" class="input" required style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd" />
+            </div>
+            <div>
+              <label>Reference</label>
+              <input id="p_ref" placeholder="INV-1004" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd" />
+            </div>
+            <div>
+              <label>Customer</label>
+              <input id="p_customer" placeholder="Customer name" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd" />
+            </div>
+            <div>
+              <label>Method</label>
+              <select id="p_method" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd">
+                <option>Bank Transfer</option>
+                <option>Cash</option>
+                <option>Cheque</option>
+                <option>Card</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label>Debit (inflow)</label>
+              <input id="p_debit" type="number" step="0.01" placeholder="0.00" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd" />
+            </div>
+            <div>
+              <label>Credit (outflow)</label>
+              <input id="p_credit" type="number" step="0.01" placeholder="0.00" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd" />
+            </div>
+            <div>
+              <label>Status</label>
+              <select id="p_status" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd">
+                <option value="paid">Paid</option>
+                <option value="pending">Pending</option>
+                <option value="overdue">Overdue</option>
+              </select>
+            </div>
+            <div>
+              <label>Currency</label>
+              <select id="p_currency" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd">
+                <option>USD</option>
+                <option>EGP</option>
+                <option>EUR</option>
+              </select>
+            </div>
+            <div style="grid-column:1/-1">
+              <label>Notes</label>
+              <textarea id="p_notes" rows="3" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd"></textarea>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+            <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Payment</button>
+          </div>
+        </form>
+      `;
+      showModal(html);
+
+      // handle submit
+      document.getElementById('paymentForm').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const data = {
+          date: document.getElementById('p_date').value || new Date().toISOString(),
+          reference: document.getElementById('p_ref').value || ('PAY-'+Date.now()),
+          customer: document.getElementById('p_customer').value || 'Unknown',
+          method: document.getElementById('p_method').value,
+          debit: Number(document.getElementById('p_debit').value) || 0,
+          credit: Number(document.getElementById('p_credit').value) || 0,
+          status: document.getElementById('p_status').value,
+          currency: document.getElementById('p_currency').value || 'USD',
+          notes: document.getElementById('p_notes').value || '',
+          createdAt: new Date()
+        };
+        await createPayment(data);
+      }, {once:true});
+    }
+
+    // View payment modal
+    window.viewPayment = function(id){
+      const p = payments.find(x=>x.id === id);
+      if(!p) return alert('Payment not found');
+      const html = `
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3>Payment Details</h3>
+          <button class="btn btn-ghost" onclick="closeModal()"><i class="fa-regular fa-xmark"></i></button>
+        </div>
+        <div style="margin-top:12px">
+          <p><strong>Date:</strong> ${formatDate(p.date)}</p>
+          <p><strong>Reference:</strong> ${p.reference}</p>
+          <p><strong>Customer:</strong> ${p.customer}</p>
+          <p><strong>Method:</strong> ${p.method}</p>
+          <p><strong>Debit:</strong> ${formatMoney(p.debit)}</p>
+          <p><strong>Credit:</strong> ${formatMoney(p.credit)}</p>
+          <p><strong>Status:</strong> ${p.status}</p>
+          <p><strong>Notes:</strong><br/>${p.notes || '-'}</p>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+            <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+            <button class="btn btn-primary" onclick="openEditFromView('${p.id}')">Edit</button>
+          </div>
+        </div>
+      `;
+      showModal(html);
+    };
+
+    // Open edit modal pre-filled
+    window.editPayment = function(id){
+      const p = payments.find(x=>x.id === id);
+      if(!p) return alert('Payment not found');
+      const html = `
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3>Edit Payment</h3>
+          <button class="btn btn-ghost" onclick="closeModal()"><i class="fa-regular fa-xmark"></i></button>
+        </div>
+        <form id="editPaymentForm" style="margin-top:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr; gap:10px">
+            <div>
+              <label>Date</label>
+              <input type="date" id="ep_date" value="${p.date ? new Date(p.date).toISOString().slice(0,10) : ''}" required style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd" />
+            </div>
+            <div>
+              <label>Reference</label>
+              <input id="ep_ref" value="${p.reference||''}" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd" />
+            </div>
+            <div>
+              <label>Customer</label>
+              <input id="ep_customer" value="${p.customer||''}" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd" />
+            </div>
+            <div>
+              <label>Method</label>
+              <select id="ep_method" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd">
+                <option ${p.method==='Bank Transfer'?'selected':''}>Bank Transfer</option>
+                <option ${p.method==='Cash'?'selected':''}>Cash</option>
+                <option ${p.method==='Cheque'?'selected':''}>Cheque</option>
+                <option ${p.method==='Card'?'selected':''}>Card</option>
+                <option ${p.method==='Other'?'selected':''}>Other</option>
+              </select>
+            </div>
+            <div>
+              <label>Debit</label>
+              <input id="ep_debit" type="number" step="0.01" value="${p.debit||0}" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd" />
+            </div>
+            <div>
+              <label>Credit</label>
+              <input id="ep_credit" type="number" step="0.01" value="${p.credit||0}" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd" />
+            </div>
+            <div>
+              <label>Status</label>
+              <select id="ep_status" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd">
+                <option value="paid" ${p.status==='paid'?'selected':''}>Paid</option>
+                <option value="pending" ${p.status==='pending'?'selected':''}>Pending</option>
+                <option value="overdue" ${p.status==='overdue'?'selected':''}>Overdue</option>
+              </select>
+            </div>
+            <div>
+              <label>Currency</label>
+              <select id="ep_currency" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd">
+                <option ${p.currency==='USD'?'selected':''}>USD</option>
+                <option ${p.currency==='EGP'?'selected':''}>EGP</option>
+                <option ${p.currency==='EUR'?'selected':''}>EUR</option>
+              </select>
+            </div>
+            <div style="grid-column:1/-1">
+              <label>Notes</label>
+              <textarea id="ep_notes" rows="3" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd">${p.notes||''}</textarea>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+            <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Update Payment</button>
+          </div>
+        </form>
+      `;
+      showModal(html);
+
+      document.getElementById('editPaymentForm').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const data = {
+          date: document.getElementById('ep_date').value,
+          reference: document.getElementById('ep_ref').value,
+          customer: document.getElementById('ep_customer').value,
+          method: document.getElementById('ep_method').value,
+          debit: Number(document.getElementById('ep_debit').value) || 0,
+          credit: Number(document.getElementById('ep_credit').value) || 0,
+          status: document.getElementById('ep_status').value,
+          currency: document.getElementById('ep_currency').value || 'USD',
+          notes: document.getElementById('ep_notes').value || ''
+        };
+        await updatePayment(id, data);
+      }, {once:true});
+    };
+
+    // helper that opens edit from view dialog
+    window.openEditFromView = function(id){ closeModal(); editPayment(id); }
+
+    /* ======= EXPORTS ======= */
+    function exportCSV(){
+      const rows = [['Date','Reference','Customer','Method','Debit','Credit','Status','Notes']];
+      payments.forEach(p => rows.push([
+        p.date ? new Date(p.date).toLocaleDateString() : '',
+        p.reference||'',
+        p.customer||'',
+        p.method||'',
+        p.debit||0,
+        p.credit||0,
+        p.status||'',
+        (p.notes||'').replace(/\n/g,' ')
+      ]));
+      const csv = rows.map(r=> r.map(c=> `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'payments.csv'; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function exportExcel(){
+      const ws = XLSX.utils.json_to_sheet(payments.map(p=>{
+        return {
+          Date: p.date ? new Date(p.date).toLocaleDateString() : '',
+          Reference: p.reference,
+          Customer: p.customer,
+          Method: p.method,
+          Debit: p.debit,
+          Credit: p.credit,
+          Status: p.status,
+          Notes: p.notes
+        };
+      }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Payments');
+      XLSX.writeFile(wb, 'payments.xlsx');
+    }
+
+    function exportPDF(){
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const headers = [['Date','Reference','Customer','Method','Debit','Credit','Status']];
+      const data = payments.map(p => [
+        p.date ? new Date(p.date).toLocaleDateString() : '',
+        p.reference||'',
+        p.customer||'',
+        p.method||'',
+        p.debit||0,
+        p.credit||0,
+        p.status||''
+      ]);
+      doc.setFontSize(12);
+      doc.text('Payments', 14, 16);
+      // use autotable
+      doc.autoTable({
+        startY: 22,
+        head: headers,
+        body: data,
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [10,60,120] }
+      });
+      doc.save('payments.pdf');
+    }
+
+    /* ======= UI bindings for filters/search ======= */
+    [searchInput, statusFilter, customerFilter, dateFrom, dateTo].forEach(el =>{
+      el.addEventListener('input', renderPayments);
+      el.addEventListener('change', renderPayments);
+    });
+
+    // expose fetchPayments for manual refresh
+    window.fetchPayments = fetchPayments;
+
+    // safe guard if FIREBASE_CONFIG not set
+    if(!FIREBASE_CONFIG || !FIREBASE_CONFIG.projectId){
+      console.warn('Firebase config not set — Firestore functions will fail until you add your config at top of script.');
+      // we still allow local demo mode by using a small sample if Firestore not available
+      // fallback demo data:
+      payments = [
+        { id:'demo1', date: new Date().toISOString(), reference:'INV-1001', customer:'Acme Corp', method:'Bank Transfer', debit:8200, credit:0, status:'paid', notes:'Payment for July' },
+        { id:'demo2', date: new Date().toISOString(), reference:'PAY-2001', customer:'Musa Trading', method:'Cash', debit:0, credit:4200, status:'pending', notes:'' }
+      ];
+      payments.forEach(p=> customersSet.add(p.customer));
+      renderPayments(); renderCustomersFilter();
+    }
+
+    // attempt to fetch real payments once if config set (but listener already set above; if config invalid it will error)
+    // If you want to initialize Firestore only when config present, wrap subscribePaymentsRealtime call in a check.
+    // (In this file, subscribePaymentsRealtime is already called above and will error if config missing — handle as needed.)
+  </script>
+</body>
+</html>

@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Reports</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- jsPDF (for PDF export) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- SheetJS (for Excel) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    :root{
+      --blue-900: #0b3d91;
+      --blue-700: #1464c9;
+      --blue-500: #2a9df4;
+      --muted: #6b7280;
+      --panel: #ffffff;
+      --bg: #f4f7fb;
+      --glass: rgba(255,255,255,0.6);
+    }
+    [data-theme="dark"]{
+      --bg: #071826;
+      --panel: #0f1724;
+      --muted: #9ca3af;
+      --blue-900: #071733;
+      --blue-700: #0a3a6b;
+      --blue-500: #1f6fb3;
+      --glass: rgba(255,255,255,0.03);
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg,var(--bg), #e9f2ff 300px);
+      color:#071331;
+      min-height:100vh;
+      transition: background .3s,color .3s;
+      --sidebar-w:260px;
+    }
+    [data-theme="dark"] body{ color:#e6eef8 }
+
+    .app{ display:flex; min-height:100vh; }
+
+    /* Sidebar */
+    .sidebar{
+      width:var(--sidebar-w);
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color: #fff;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      position:fixed;
+      left:0; top:0; bottom:0;
+      box-shadow: 0 6px 24px rgba(10,25,60,0.12);
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+    /* Main */
+    .main{ margin-left:var(--sidebar-w); padding:24px; width:calc(100% - var(--sidebar-w)); }
+
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+    .search{ flex:1; max-width:520px; display:flex; gap:8px; align-items:center; }
+    .search input{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,0.06); background:var(--panel) }
+
+    .controls{ display:flex; gap:10px; align-items:center; }
+
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; cursor:pointer; border:none; font-weight:600; }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; box-shadow: 0 8px 18px rgba(42,157,244,0.14); }
+    .btn-ghost{ background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted); padding:8px 10px; border-radius:10px; }
+
+    .grid{ display:grid; grid-template-columns: repeat(12, 1fr); gap:18px; align-items:start; }
+
+    .card{ background:var(--panel); border-radius:12px; padding:16px; box-shadow: 0 6px 20px rgba(16,24,40,0.04); transition: transform .28s, box-shadow .28s; overflow:hidden; }
+    .card:hover{ transform: translateY(-6px); box-shadow: 0 16px 36px rgba(16,24,40,0.08); }
+
+    .stat{ grid-column: span 3; display:flex; gap:12px; align-items:center; }
+    .badge{ width:54px; height:54px; border-radius:12px; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg,var(--blue-500),var(--blue-700)); color:#fff; font-size:1.25rem; box-shadow: 0 6px 18px rgba(42,157,244,0.12); }
+    .stat h4{ margin:0; font-size:1.05rem; }
+    .stat p{ margin:0; color:var(--muted); font-size:.9rem }
+
+    .chart-large{ grid-column: span 8; min-height:320px; display:flex; flex-direction:column; gap:12px; }
+    .chart-side{ grid-column: span 4; min-height:320px; }
+
+    .transactions{ grid-column: span 8; }
+    .inventory{ grid-column: span 4; }
+
+    table{ width:100%; border-collapse:collapse; font-size:.95rem; }
+    thead th{ text-align:left; color:var(--muted); font-weight:700; padding:10px 6px; font-size:.86rem }
+    tbody tr{ transition: background .18s, transform .18s; border-bottom:1px solid rgba(0,0,0,0.04) }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform: translateX(4px); }
+    td{ padding:12px 6px; vertical-align:middle }
+
+    .list-item{ display:flex; gap:12px; align-items:center; padding:10px; border-radius:8px; }
+    .product-thumb{ width:56px; height:56px; border-radius:8px; background:#eef7ff; display:flex; align-items:center; justify-content:center; color:var(--blue-700) }
+
+    .filters{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+    .filters select, .filters input{ padding:8px; border-radius:8px; border:1px solid rgba(15,23,42,0.06); background:var(--panel); }
+
+    .page-footer{ text-align:center; padding:22px 0; color:var(--muted); margin-top:18px; }
+
+    @media (max-width:1100px){
+      :root{ --sidebar-w:72px }
+      .sidebar{ width:var(--sidebar-w); padding:12px; }
+      .brand span{ display:none }
+      .main{ margin-left:var(--sidebar-w); width:calc(100% - var(--sidebar-w)); padding:14px; }
+      .stat{ grid-column: span 6 }
+      .chart-large{ grid-column: span 12 }
+      .chart-side{ grid-column: span 12 }
+      .transactions{ grid-column: span 12 }
+      .inventory{ grid-column: span 12 }
+    }
+
+    @keyframes popIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+    .card{ animation: popIn .45s ease both }
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="app" id="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+        <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+        <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+        <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+        <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+        <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+        <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+        <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+        <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+        <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+        <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+        <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+        <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+        <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+        <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+        <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+        <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+        <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+        <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-circle-info"></i></div>
+        <div>
+          <div style="font-weight:700">Factory #12</div>
+          <div style="font-size:.85rem;opacity:.9">Plan: Enterprise</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2 style="margin:0">Reports</h2>
+        <div style="color:var(--muted)">Advanced financial reporting & exports</div>
+      </div>
+
+      <div class="controls">
+        <div class="search">
+          <input id="globalSearch" placeholder="Search invoices, tx refs, accounts..." />
+        </div>
+
+        <button class="btn icon-btn" title="Notifications"><i class="fa-regular fa-bell"></i></button>
+        <button onclick="toggleTheme()" class="btn icon-btn" id="themeToggle" title="Toggle dark mode"><i class="fa-regular fa-moon"></i></button>
+        <button class="btn btn-primary" onclick="openCreateReport()"><i class="fa-solid fa-plus"></i> New Report</button>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="filters" style="align-items:center">
+          <label>From: <input type="date" id="filterFrom"></label>
+          <label>To: <input type="date" id="filterTo"></label>
+          <select id="filterType">
+            <option value="all">All Types</option>
+            <option value="invoice">Invoice</option>
+            <option value="payment">Payment</option>
+            <option value="expense">Expense</option>
+          </select>
+          <select id="filterClient">
+            <option value="all">All Clients</option>
+            <option>Alpha Co</option>
+            <option>Beta Supplies</option>
+            <option>Gamma Industries</option>
+          </select>
+          <select id="filterStatus">
+            <option value="all">Any Status</option>
+            <option value="paid">Paid</option>
+            <option value="due">Due</option>
+            <option value="overdue">Overdue</option>
+          </select>
+          <button class="btn btn-ghost" onclick="applyFilters()">Apply</button>
+          <button class="btn btn-ghost" onclick="resetFilters()">Reset</button>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-ghost" onclick="exportReportPDF()"><i class="fa-regular fa-file-pdf"></i> Export PDF</button>
+          <button class="btn btn-ghost" onclick="exportReportExcel()"><i class="fa-regular fa-file-excel"></i> Export Excel</button>
+          <button class="btn btn-ghost" onclick="exportReportCSV()"><i class="fa-regular fa-file-csv"></i> Export CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grid -->
+    <section class="grid">
+
+      <!-- Stat cards -->
+      <div class="stat card">
+        <div class="badge"><i class="fa-solid fa-dollar-sign"></i></div>
+        <div>
+          <h4 id="totalSales">$0</h4>
+          <p>Total Sales (YTD)</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#f97316,#f59e0b)"><i class="fa-solid fa-receipt"></i></div>
+        <div>
+          <h4 id="totalExpenses">$0</h4>
+          <p>Total Expenses (YTD)</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#34d399,#10b981)"><i class="fa-solid fa-chart-line-up"></i></div>
+        <div>
+          <h4 id="grossProfit">$0</h4>
+          <p>Gross Profit</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)"><i class="fa-solid fa-file-invoice"></i></div>
+        <div>
+          <h4 id="invoicesCount">0</h4>
+          <p>Invoices</p>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="chart-large card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>Monthly Sales & Expenses</strong>
+            <div style="color:var(--muted);font-size:.95rem">Last 12 months</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost" onclick="randomizeMonthly()">Randomize</button>
+          </div>
+        </div>
+        <canvas id="monthlyChart" style="width:100%;height:320px"></canvas>
+      </div>
+
+      <div class="chart-side card">
+        <strong>Expenses Breakdown</strong>
+        <div style="color:var(--muted);font-size:.9rem;margin-bottom:10px">This month</div>
+        <canvas id="expensesDonut" style="max-height:260px"></canvas>
+      </div>
+
+      <div class="chart-large card">
+        <strong>Profit Trend</strong>
+        <div style="color:var(--muted);font-size:.9rem;margin-bottom:10px">Cumulative profit over months</div>
+        <canvas id="profitLine" style="width:100%;height:220px"></canvas>
+      </div>
+
+      <!-- Transactions Table -->
+      <div class="transactions card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <strong>Report Table</strong>
+            <div style="color:var(--muted);font-size:.9rem">Detailed entries (searchable & exportable)</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="tableSearch" placeholder="Search table..." style="padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.06)">
+            <button class="btn btn-ghost" onclick="downloadTablePDF()">Print / PDF</button>
+            <button class="btn btn-ghost" onclick="downloadTableExcel()">Excel</button>
+          </div>
+        </div>
+
+        <div style="overflow:auto">
+          <table id="reportTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Ref</th>
+                <th>Type</th>
+                <th>Client</th>
+                <th>Net</th>
+                <th>Tax</th>
+                <th>Discount</th>
+                <th>Total</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="reportBody">
+              <!-- Filled by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Inventory snapshot -->
+      <div class="inventory card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>Inventory Snapshot</strong>
+            <div style="color:var(--muted);font-size:.9rem">Low stock & top movers</div>
+          </div>
+          <button class="btn btn-ghost" onclick="goInventory()">Open Inventory</button>
+        </div>
+
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+          <div class="list-item">
+            <div class="product-thumb"><i class="fa-solid fa-blender"></i></div>
+            <div>
+              <div style="font-weight:700">Moulinex Blender LM2421EG</div>
+              <div style="color:var(--muted);font-size:.9rem">Sold: 120 this month • Stock: 3</div>
+            </div>
+            <div style="margin-left:auto;color:#f97316;font-weight:700">Low</div>
+          </div>
+          <div class="list-item">
+            <div class="product-thumb"><i class="fa-solid fa-cog"></i></div>
+            <div>
+              <div style="font-weight:700">Gear Set 200</div>
+              <div style="color:var(--muted);font-size:.9rem">Sold: 40 • Stock: 1</div>
+            </div>
+            <div style="margin-left:auto;color:#ef4444;font-weight:700">Critical</div>
+          </div>
+          <div class="list-item">
+            <div class="product-thumb"><i class="fa-solid fa-box"></i></div>
+            <div>
+              <div style="font-weight:700">Packaging Box - Medium</div>
+              <div style="color:var(--muted);font-size:.9rem">Sold: 250 • Stock: 430</div>
+            </div>
+            <div style="margin-left:auto;color:#10b981;font-weight:700">OK</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <div class="page-footer">© 2025 FinMate — Accounting for Manufacturers</div>
+  </main>
+
+</div>
+
+<script>
+  // theme load
+  (function(){
+    const saved = localStorage.getItem('bf_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+    if(saved === 'dark') document.getElementById('themeToggle').innerHTML = '<i class="fa-regular fa-sun"></i>';
+  })();
+
+  function toggleTheme(){
+    const dt = document.documentElement;
+    const current = dt.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    dt.setAttribute('data-theme', next);
+    localStorage.setItem('bf_theme', next);
+    document.getElementById('themeToggle').innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  }
+
+  // -------- sample report data (would come from DB / Firebase) ----------
+  const reportRows = [
+    {date:'2025-01-15', ref:'INV-1001', type:'invoice', client:'Alpha Co', net:8200, tax:820, discount:0, total:9020, status:'paid'},
+    {date:'2025-02-03', ref:'EXP-2001', type:'expense', client:'Office', net:1200, tax:0, discount:0, total:1200, status:'paid'},
+    {date:'2025-03-10', ref:'INV-1010', type:'invoice', client:'Beta Supplies', net:9600, tax:960, discount:100, total:10460, status:'due'},
+    {date:'2025-04-12', ref:'PAY-3002', type:'payment', client:'Gamma Industries', net:5600, tax:0, discount:0, total:5600, status:'paid'},
+    {date:'2025-05-05', ref:'INV-1030', type:'invoice', client:'Alpha Co', net:10200, tax:1020, discount:200, total:11120, status:'overdue'},
+    {date:'2025-06-18', ref:'EXP-2100', type:'expense', client:'Transport', net:450, tax:0, discount:0, total:450, status:'paid'}
+  ];
+
+  // populate report table
+  function renderReportTable(list = reportRows){
+    const tbody = document.getElementById('reportBody');
+    tbody.innerHTML = '';
+    list.forEach(r=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.date}</td>
+        <td>${r.ref}</td>
+        <td style="text-transform:capitalize">${r.type}</td>
+        <td>${r.client}</td>
+        <td>$${r.net.toLocaleString()}</td>
+        <td>$${r.tax.toLocaleString()}</td>
+        <td>$${r.discount.toLocaleString()}</td>
+        <td style="font-weight:700">$${r.total.toLocaleString()}</td>
+        <td style="text-transform:capitalize">${r.status}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    updateSummary(list);
+  }
+
+  // update summary cards
+  function updateSummary(list){
+    const totalSales = list.filter(r=>r.type==='invoice').reduce((s,v)=>s+v.net,0);
+    const totalExpenses = list.filter(r=>r.type==='expense').reduce((s,v)=>s+v.net,0);
+    const invoices = list.filter(r=>r.type==='invoice').length;
+    const gross = totalSales - totalExpenses;
+
+    document.getElementById('totalSales').textContent = '$' + totalSales.toLocaleString();
+    document.getElementById('totalExpenses').textContent = '$' + totalExpenses.toLocaleString();
+    document.getElementById('grossProfit').textContent = '$' + gross.toLocaleString();
+    document.getElementById('invoicesCount').textContent = invoices;
+  }
+  renderReportTable();
+
+  // table search
+  document.getElementById('tableSearch').addEventListener('input', function(){
+    const q = this.value.trim().toLowerCase();
+    if(!q) return renderReportTable();
+    const filtered = reportRows.filter(r => [r.ref, r.client, r.type, r.status].join(' ').toLowerCase().includes(q));
+    renderReportTable(filtered);
+  });
+
+  // global search filters transactions & table
+  document.getElementById('globalSearch').addEventListener('input', function(){
+    const q = this.value.trim().toLowerCase();
+    if(!q) { renderReportTable(); return; }
+    const filtered = reportRows.filter(r => [r.ref, r.client, r.type].join(' ').toLowerCase().includes(q));
+    renderReportTable(filtered);
+  });
+
+  // apply filters
+  function applyFilters(){
+    const from = document.getElementById('filterFrom').value;
+    const to = document.getElementById('filterTo').value;
+    const type = document.getElementById('filterType').value;
+    const client = document.getElementById('filterClient').value;
+    const status = document.getElementById('filterStatus').value;
+
+    let filtered = reportRows.slice();
+    if(type !== 'all') filtered = filtered.filter(r => r.type === type);
+    if(client !== 'all') filtered = filtered.filter(r => r.client === client);
+    if(status !== 'all') filtered = filtered.filter(r => r.status === status);
+    if(from) filtered = filtered.filter(r => new Date(r.date) >= new Date(from));
+    if(to) filtered = filtered.filter(r => new Date(r.date) <= new Date(to));
+    renderReportTable(filtered);
+    updateChartsFromRows(filtered);
+  }
+
+  function resetFilters(){ document.getElementById('filterFrom').value=''; document.getElementById('filterTo').value=''; document.getElementById('filterType').value='all'; document.getElementById('filterClient').value='all'; document.getElementById('filterStatus').value='all'; renderReportTable(); updateChartsFromRows(); }
+
+  // ---------------- Charts ----------------
+  // monthly chart (sample data)
+  const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let monthlySales = [8200,9600,10200,9400,8800,10040,11000,9800,12000,10500,9800,12500];
+  let monthlyExpenses = [4200,5600,4800,5300,5400,6260,6100,5200,6500,6000,5800,6900];
+
+  const monthlyChart = new Chart(monthlyCtx, {
+    type:'bar',
+    data:{ labels: months, datasets:[
+      { label:'Sales', data: monthlySales, backgroundColor:'rgba(42,157,244,0.9)', borderRadius:6 },
+      { label:'Expenses', data: monthlyExpenses, backgroundColor:'rgba(231,111,81,0.9)', borderRadius:6 }
+    ]},
+    options:{ responsive:true, interaction:{mode:'index', intersect:false}, plugins:{legend:{position:'top'}}, scales:{ x:{grid:{display:false}}, y:{grid:{color:'rgba(0,0,0,0.04)'}} } }
+  });
+
+  // expenses donut
+  const expensesCtx = document.getElementById('expensesDonut').getContext('2d');
+  const expenseChart = new Chart(expensesCtx, {
+    type:'doughnut',
+    data:{ labels:['Labor','Materials','Transport','Utilities'], datasets:[ { data:[45,30,15,10], backgroundColor:['#2a9df4','#17a2b8','#f59e0b','#ef4444'] } ] },
+    options:{ plugins:{legend:{position:'bottom'}} }
+  });
+
+  // profit line
+  const profitCtx = document.getElementById('profitLine').getContext('2d');
+  const profitData = monthlySales.map((s,i)=> s - monthlyExpenses[i]);
+  const profitChart = new Chart(profitCtx, {
+    type:'line',
+    data:{ labels: months, datasets:[ { label:'Profit', data: profitData, borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.08)', fill:true, tension:0.25 } ] },
+    options:{ plugins:{legend:{display:false}} }
+  });
+
+  function updateChartsFromRows(rows = reportRows){
+    // simple example: rebuild expense donut from rows
+    const categories = {Labor:0,Materials:0,Transport:0,Utilities:0,Other:0};
+    rows.forEach(r=>{
+      if(r.type === 'expense'){
+        // naive: put all expenses to 'Materials' for demo — in real data you have categories
+        categories.Materials += r.net;
+      } else if(r.type==='invoice'){
+        categories.Labor += r.net * 0.05; // fake distribution
+        categories.Transport += r.net * 0.02;
+      }
+    });
+    const values = [categories.Labor,categories.Materials,categories.Transport,categories.Utilities];
+    expenseChart.data.datasets[0].data = values.map(v=>Math.round(v));
+    expenseChart.update();
+  }
+
+  function randomizeMonthly(){
+    monthlySales = monthlySales.map(v => Math.round(v * (0.7 + Math.random()*0.8)));
+    monthlyExpenses = monthlyExpenses.map(v => Math.round(v * (0.7 + Math.random()*0.9)));
+    monthlyChart.data.datasets[0].data = monthlySales;
+    monthlyChart.data.datasets[1].data = monthlyExpenses;
+    monthlyChart.update();
+
+    profitChart.data.datasets[0].data = monthlySales.map((s,i)=> s - monthlyExpenses[i]);
+    profitChart.update();
+
+    // update summary
+    const salesSum = monthlySales.reduce((a,b)=>a+b,0);
+    const expSum = monthlyExpenses.reduce((a,b)=>a+b,0);
+    document.getElementById('totalSales').textContent = '$' + salesSum.toLocaleString();
+    document.getElementById('totalExpenses').textContent = '$' + expSum.toLocaleString();
+    document.getElementById('grossProfit').textContent = '$' + (salesSum - expSum).toLocaleString();
+  }
+
+  // ---------------- Export helpers ----------------
+  function exportReportCSV(){
+    // build rows from current table
+    const rows = [['Date','Ref','Type','Client','Net','Tax','Discount','Total','Status']];
+    const trs = document.querySelectorAll('#reportBody tr');
+    trs.forEach(tr=>{
+      const cols = [...tr.children].map(td => td.textContent.trim().replace(/\$/g,''));
+      rows.push(cols);
+    });
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'reports.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportReportExcel(){
+    const wb = XLSX.utils.book_new();
+    const table = document.getElementById('reportTable');
+    const ws = XLSX.utils.table_to_sheet(table);
+    XLSX.utils.book_append_sheet(wb, ws, 'Reports');
+    XLSX.writeFile(wb, 'reports.xlsx');
+  }
+
+  async function exportReportPDF(){
+    // simple approach: take tables and charts as images and build PDF
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('landscape', 'pt', 'a4');
+    pdf.setFontSize(14);
+    pdf.text('BlueFactory — Reports', 40, 40);
+
+    // add monthly chart as image
+    const monthlyImg = document.getElementById('monthlyChart').toDataURL('image/png',1.0);
+    pdf.addImage(monthlyImg, 'PNG', 40, 60, 420, 220);
+
+    // add expenses donut
+    const donutImg = document.getElementById('expensesDonut').toDataURL('image/png',1.0);
+    pdf.addImage(donutImg, 'PNG', 480, 60, 220, 180);
+
+    // table snapshot: convert table HTML to text table (simple)
+    let y = 300;
+    pdf.setFontSize(12);
+    pdf.text('Report Table (latest rows)', 40, y); y += 14;
+    const rows = [['Date','Ref','Type','Client','Total','Status']];
+    reportRows.slice(-10).forEach(r => rows.push([r.date, r.ref, r.type, r.client, '$'+r.total, r.status]));
+    pdf.autoTable({
+      startY: y+6,
+      head: [rows[0]],
+      body: rows.slice(1),
+      theme: 'grid',
+      styles: { fontSize: 9 }
+    });
+
+    pdf.save('bluefactory_reports.pdf');
+  }
+
+  // Note: jspdf autotable plugin would be nicer — using simple approach for demo.
+
+  // Download table PDF (print-friendly)
+  function downloadTablePDF(){
+    // open a print window with table HTML
+    const tableHtml = document.getElementById('reportTable').outerHTML;
+    const w = window.open('', '_blank');
+    w.document.write(`<html><head><title>Report Print</title><style>table{width:100%;border-collapse:collapse}td,th{padding:8px;border:1px solid #ccc}</style></head><body><h3>BlueFactory — Report</h3>${tableHtml}</body></html>`);
+    w.document.close();
+    w.print();
+  }
+
+  function downloadTableExcel(){
+    exportReportExcel();
+  }
+
+  // wrapper for exportReportPDF using autoTable plugin if available
+  async function exportReportPDF(){
+    // Basic fallback: combine charts + table into a printable window then save as PDF via print
+    const w = window.open('', '_blank');
+    const monthlyImg = document.getElementById('monthlyChart').toDataURL();
+    const donutImg = document.getElementById('expensesDonut').toDataURL();
+    const tableHtml = document.getElementById('reportTable').outerHTML;
+    w.document.write(`<html><head><title>BlueFactory Reports</title><style>body{font-family:Arial} .row{display:flex;gap:10px} img{max-width:100%} table{width:100%;border-collapse:collapse} td,th{padding:8px;border:1px solid #ccc}</style></head><body><h2>BlueFactory — Reports</h2><div class="row"><div style="flex:1"><img src="${monthlyImg}"/></div><div style="width:320px"><img src="${donutImg}"/></div></div><h3>Report Table</h3>${tableHtml}</body></html>`);
+    w.document.close();
+    // user can print to PDF
+  }
+
+  // wrapper functions
+  function openCreateReport(){ alert('Open Create Report modal (to implement)'); }
+  function goInventory(){ window.location.href = 'inventory.html'; }
+
+  // connect other buttons
+  document.getElementById('globalSearch').addEventListener('keypress', e => { if(e.key === 'Enter') e.preventDefault(); });
+
+  // small helpers for UI exports referenced earlier but not critical:
+  function exportReportPDF() { downloadTablePDF(); } // simple fallback
+
+  // init summary from sample monthly
+  (function init(){
+    const salesSum = monthlySales.reduce((a,b)=>a+b,0);
+    const expSum = monthlyExpenses.reduce((a,b)=>a+b,0);
+    document.getElementById('totalSales').textContent = '$' + salesSum.toLocaleString();
+    document.getElementById('totalExpenses').textContent = '$' + expSum.toLocaleString();
+    document.getElementById('grossProfit').textContent = '$' + (salesSum-expSum).toLocaleString();
+    document.getElementById('invoicesCount').textContent = reportRows.filter(r=>r.type==='invoice').length;
+  })();
+
+</script>
+</body>
+</html>

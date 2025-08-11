@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Payroll</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* ===== BlueFactory theme variables ===== */
+    :root{
+      --blue-900: #0b3d91;
+      --blue-700: #1464c9;
+      --blue-500: #2a9df4;
+      --muted: #6b7280;
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --glass: rgba(255,255,255,0.6);
+      --accent: #17a2b8;
+      --radius: 12px;
+    }
+    [data-theme="dark"]{
+      --bg: #0f1724;
+      --panel: #111827;
+      --muted: #9ca3af;
+      --blue-900: #071733;
+      --blue-700: #0a3a6b;
+      --blue-500: #1f6fb3;
+      --glass: rgba(255,255,255,0.03);
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg), #e9f2ff 300px);
+      color:#0b1220;
+      min-height:100vh;
+      --sidebar-w:260px;
+    }
+    [data-theme="dark"] body{ color:#e6eef8;}
+
+    .app{ display:flex; min-height:100vh; }
+
+    /* Sidebar */
+    .sidebar{
+      width:var(--sidebar-w);
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color:#fff;
+      padding:18px;
+      display:flex; flex-direction:column; gap:18px;
+      position:fixed; left:0; top:0; bottom:0;
+      box-shadow: 0 6px 24px rgba(10,25,60,0.12);
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem; color:#fff; transform:translateY(-1px) }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y: auto; /* تفعيل السكرول */ padding-right: 5px; /* عشان يبان السكرول */ }
+    /* شكل السكرول في المتصفحات الحديثة */
+.nav-links::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+    .nav-link{
+      display:flex; align-items:center; gap:12px;
+      padding:10px; border-radius:10px; color:rgba(255,255,255,0.9); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{
+      background: rgba(255,255,255,0.06);
+      transform:translateX(6px);
+    }
+
+    .sidebar-footer{ margin-top:auto; font-size:0.9rem; opacity:0.95 }
+
+    /* Main area */
+    .main{ margin-left:var(--sidebar-w); padding:24px; width:calc(100% - var(--sidebar-w)); transition: width .3s, margin-left .3s; }
+
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+    .search{ flex:1; max-width:640px; display:flex; gap:8px; align-items:center; }
+    .search input{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,0.06); background:var(--panel); box-shadow: 0 2px 8px rgba(11,18,32,0.04); }
+    .controls{ display:flex; gap:10px; align-items:center; }
+
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; cursor:pointer; border:none; font-weight:600; }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; box-shadow: 0 8px 18px rgba(42,157,244,0.14) }
+    .btn-ghost{ background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted) }
+    .icon-btn{ background:var(--panel); padding:8px; border-radius:10px; border:1px solid rgba(15,23,42,0.05) }
+
+    .grid{ display:grid; grid-template-columns: repeat(12, 1fr); gap:18px; align-items:start; }
+
+    .card{ background:var(--panel); border-radius:var(--radius); padding:16px; box-shadow: 0 6px 20px rgba(16,24,40,0.04); transition: transform .28s, box-shadow .28s; overflow:hidden; }
+    .card:hover{ transform: translateY(-6px); box-shadow: 0 16px 36px rgba(16,24,40,0.08); }
+
+    .stat{ grid-column: span 3; display:flex; gap:12px; align-items:center; }
+    .badge{ width:54px; height:54px; border-radius:12px; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg,var(--blue-500),var(--blue-700)); color:#fff; font-size:1.25rem }
+
+    .stat h4{ margin:0; font-size:1.05rem; } .stat p{ margin:0; color:var(--muted); font-size:.9rem }
+
+    .chart-large{ grid-column: span 8; min-height:320px; display:flex; flex-direction:column; gap:12px; }
+    .chart-side{ grid-column: span 4; min-height:320px; }
+
+    .table-wrap{ grid-column: span 12; }
+    table{ width:100%; border-collapse:collapse; font-size:.95rem; }
+    thead th{ text-align:left; color:var(--muted); font-weight:700; padding:10px 6px; font-size:.86rem }
+    tbody tr{ transition: background .18s, transform .18s; border-bottom:1px solid rgba(0,0,0,0.04) }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform: translateX(4px); }
+    td{ padding:12px 6px; vertical-align:middle }
+    .muted{ color:var(--muted); font-size:.95rem }
+
+    /* payroll run badge */
+    .pill{ display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(2,6,23,0.04); font-weight:700; color:var(--muted) }
+
+    /* modal */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:9999 }
+    .modal{ width:100%; max-width:980px; background:var(--panel); border-radius:12px; padding:18px; box-shadow: 0 20px 60px rgba(2,6,23,0.4); max-height:90vh; overflow:auto }
+
+    @media (max-width:1100px){
+      :root{ --sidebar-w:72px } .sidebar{ width:var(--sidebar-w); padding:12px } .brand span{ display:none } .main{ margin-left:var(--sidebar-w); width:calc(100% - var(--sidebar-w)); padding:14px }
+      .stat{ grid-column: span 6 } .chart-large{ grid-column: span 12 } .chart-side{ grid-column: span 12 }
+    }
+    @media (max-width:640px){ .search{ display:none } .sidebar{ position:fixed; z-index:50 } }
+
+    @keyframes popIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+    .card{ animation: popIn .45s ease both }
+
+    .small-muted{ color:var(--muted); font-size:.85rem }
+    .input, input, select { padding:10px;border-radius:8px;border:1px solid #ddd;width:100% }
+    .field-row{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+    .field-row-3{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  </style>
+</head>
+
+<body data-theme="light">
+<div class="app">
+
+ 
+    <!-- SIDEBAR -->
+  <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+      <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+      <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+      <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="width:42px;height:42px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-circle-info"></i></div>
+        <div>
+          <div style="font-weight:700">Factory #12</div>
+          <div style="font-size:.85rem;opacity:.95">Plan: Enterprise</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main" role="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2 style="margin:0">Payroll</h2>
+        <div class="muted">Manage salary runs, taxes, deductions and payslips</div>
+      </div>
+
+      <div class="controls">
+        <div class="search" role="search"><input id="globalSearch" placeholder="Search employees, payroll runs, notes..." /></div>
+        <button class="btn icon-btn" title="Notifications"><i class="fa-regular fa-bell"></i></button>
+        <button onclick="toggleTheme()" class="btn icon-btn" id="themeToggle" title="Toggle theme"><i class="fa-regular fa-moon"></i></button>
+        <button class="btn btn-primary" id="newRunBtn"><i class="fa-solid fa-calendar-plus"></i> New Payroll Run</button>
+      </div>
+    </div>
+
+    <section class="grid">
+
+      <!-- Stats -->
+      <div class="stat card">
+        <div class="badge"><i class="fa-solid fa-sack-dollar"></i></div>
+        <div><h4 id="statTotal">EGP 0</h4><p>Total payroll (this month)</p></div>
+      </div>
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#34d399,#10b981)"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+        <div><h4 id="statNet">EGP 0</h4><p>Net payouts</p></div>
+      </div>
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#f97316,#f59e0b)"><i class="fa-solid fa-file-invoice"></i></div>
+        <div><h4 id="statTax">EGP 0</h4><p>Taxes withheld</p></div>
+      </div>
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)"><i class="fa-solid fa-file-circle-minus"></i></div>
+        <div><h4 id="statDeduct">EGP 0</h4><p>Total deductions</p></div>
+      </div>
+
+      <!-- Chart -->
+      <div class="chart-large card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>Payroll trend (last 6 months)</strong>
+            <div class="muted">Gross vs Net</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost" onclick="refreshTrend()">Refresh</button>
+            <button class="btn btn-ghost" onclick="exportPayroll()">Export</button>
+          </div>
+        </div>
+        <canvas id="payrollTrend" style="width:100%;max-height:320px"></canvas>
+      </div>
+
+      <!-- Runs list -->
+      <div class="chart-side card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>Payroll Runs</strong><div class="muted">Recent salary cycles</div></div>
+          <button class="btn btn-ghost" onclick="openRunsManager()">Manage</button>
+        </div>
+
+        <div id="runsList" style="margin-top:12px;display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+
+      <!-- Employees table -->
+      <div class="table-wrap card" style="grid-column: span 12;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <strong>Employees</strong>
+            <div class="muted">Add employees, set salaries, view payslips</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="filterStatus" class="input" placeholder="Filter by status (active/terminated)" style="width:220px" />
+            <button class="btn btn-ghost" onclick="exportEmployees()">Export</button>
+            <button class="btn btn-primary" onclick="openEmployeeModal()">Add Employee</button>
+          </div>
+        </div>
+
+        <div style="overflow:auto">
+          <table aria-describedby="Employees table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Salary (EGP)</th>
+                <th>Last Payment</th>
+                <th>Status</th>
+                <th style="width:180px">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="employeesBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Recent payments -->
+      <div class="card" style="grid-column: span 6;">
+        <strong>Recent Payments</strong>
+        <div class="muted" style="margin-bottom:10px">Latest payslips issued</div>
+        <div id="recentPayments" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+
+      <!-- Payroll summary -->
+      <div class="card" style="grid-column: span 6;">
+        <strong>Payroll Summary</strong>
+        <div class="muted" style="margin-bottom:10px">Quick breakdown</div>
+        <div id="summaryList" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+
+    </section>
+
+    <div style="text-align:center;padding:22px 0;color:var(--muted)">© 2025 BlueFactory — Payroll Module</div>
+  </main>
+</div>
+
+<!-- Employee Modal -->
+<div id="employeeModal" class="modal-backdrop" style="display:none" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="empModalTitle">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <strong id="empModalTitle">Add Employee</strong>
+      <button class="btn icon-btn" onclick="closeEmployeeModal()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="employeeForm" style="margin-top:12px">
+      <input type="hidden" id="empId">
+      <div class="field-row">
+        <div>
+          <label class="small-muted">Full name</label>
+          <input id="empName" class="input" required>
+        </div>
+        <div>
+          <label class="small-muted">Role / Position</label>
+          <input id="empRole" class="input">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div>
+          <label class="small-muted">Email</label>
+          <input id="empEmail" class="input" type="email">
+        </div>
+        <div>
+          <label class="small-muted">Phone</label>
+          <input id="empPhone" class="input">
+        </div>
+      </div>
+
+      <div class="field-row-3" style="margin-top:10px">
+        <div>
+          <label class="small-muted">Base salary (EGP / month)</label>
+          <input id="empSalary" class="input" type="number" step="0.01" value="0">
+        </div>
+        <div>
+          <label class="small-muted">Tax rate %</label>
+          <input id="empTax" class="input" type="number" step="0.01" value="10">
+        </div>
+        <div>
+          <label class="small-muted">Status</label>
+          <select id="empStatus" class="input"><option value="active">Active</option><option value="on_leave">On leave</option><option value="terminated">Terminated</option></select>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:12px;justify-content:flex-end">
+        <button type="button" class="btn btn-ghost" onclick="closeEmployeeModal()">Cancel</button>
+        <button class="btn btn-primary" type="submit">Save Employee</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Payroll Run Modal -->
+<div id="runModal" class="modal-backdrop" style="display:none" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="runModalTitle">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <strong id="runModalTitle">New Payroll Run</strong>
+      <button class="btn icon-btn" onclick="closeRunModal()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <form id="runForm" style="margin-top:12px">
+      <div class="field-row">
+        <div>
+          <label class="small-muted">Run name</label>
+          <input id="runName" class="input" required />
+        </div>
+        <div>
+          <label class="small-muted">Period (month)</label>
+          <input id="runPeriod" class="input" type="month" value="">
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label class="small-muted">Notes</label>
+        <input id="runNotes" class="input" placeholder="Optional description"/>
+      </div>
+
+      <div style="margin-top:12px">
+        <strong>Adjustments</strong>
+        <div class="muted">You can apply global adjustments (e.g. bonus, company deductions)</div>
+        <div class="field-row" style="margin-top:8px">
+          <div><label class="small-muted">Global bonus (EGP)</label><input id="globalBonus" class="input" type="number" value="0"></div>
+          <div><label class="small-muted">Global deduction (EGP)</label><input id="globalDeduct" class="input" type="number" value="0"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:12px;justify-content:flex-end">
+        <button type="button" class="btn btn-ghost" onclick="closeRunModal()">Cancel</button>
+        <button class="btn btn-primary" type="submit">Compute & Create Run</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Payslip print frame (hidden) -->
+<iframe id="printFrame" style="display:none"></iframe>
+
+<script>
+  /* =========================
+     Local data & boot
+     ========================= */
+  const EMP_KEY = 'bf_payroll_employees_v1';
+  const RUN_KEY = 'bf_payroll_runs_v1';
+
+  // seed sample employees if none
+  if(!localStorage.getItem(EMP_KEY)){
+    const initial = [
+      {id:id(), name:'Ahmed Ali', role:'Production Manager', email:'ahmed@factory.com', phone:'+201234567890', salary:15000, taxRate:10, status:'active', lastPaid:'2025-07-31'},
+      {id:id(), name:'Mona Ibrahim', role:'Accountant', email:'mona@factory.com', phone:'+201198765432', salary:9000, taxRate:12, status:'active', lastPaid:'2025-07-31'},
+      {id:id(), name:'Sameh Omar', role:'Technician', email:'sameh@factory.com', phone:'+201011223344', salary:6000, taxRate:8, status:'active', lastPaid:'2025-07-15'},
+    ];
+    localStorage.setItem(EMP_KEY, JSON.stringify(initial));
+  }
+  if(!localStorage.getItem(RUN_KEY)){
+    localStorage.setItem(RUN_KEY, JSON.stringify([]));
+  }
+
+  let employees = load(EMP_KEY);
+  let runs = load(RUN_KEY);
+
+  // initial render
+  document.addEventListener('DOMContentLoaded', ()=>{
+    renderEmployees();
+    renderRuns();
+    updateStats();
+    initTrendChart();
+    renderRecentPayments();
+    wireEvents();
+    // theme
+    const saved = localStorage.getItem('bf_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+    if(saved === 'dark') document.getElementById('themeToggle').innerHTML = '<i class="fa-regular fa-sun"></i>';
+  });
+
+  function id(){ return 'e_'+Math.random().toString(36).slice(2,9); }
+  function load(k){ try{ return JSON.parse(localStorage.getItem(k)) || []; }catch(e){ return [] } }
+  function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+
+  /* =========================
+     UI & CRUD employees
+     ========================= */
+  function renderEmployees(){
+    employees = load(EMP_KEY);
+    const tbody = document.getElementById('employeesBody');
+    tbody.innerHTML = '';
+    const q = document.getElementById('globalSearch').value.trim().toLowerCase();
+    const statusFilter = document.getElementById('filterStatus').value.trim().toLowerCase();
+    employees.filter(emp=>{
+      if(q){
+        const hay = [emp.name,emp.role,emp.email,emp.phone].join(' ').toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      if(statusFilter && !emp.status.toLowerCase().includes(statusFilter)) return false;
+      return true;
+    }).forEach(emp=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${escape(emp.name)}</strong><div class="small-muted">${escape(emp.email)}</div></td>
+        <td>${escape(emp.role)}</td>
+        <td style="font-weight:700">EGP ${Number(emp.salary).toLocaleString()}</td>
+        <td class="small-muted">${emp.lastPaid || '-'}</td>
+        <td><span class="pill">${capitalize(emp.status)}</span></td>
+        <td class="actions">
+          <button class="btn btn-ghost" onclick="viewPayslipPreview('${emp.id}')"><i class="fa-regular fa-file-lines"></i> Payslip</button>
+          <button class="btn btn-ghost" onclick="editEmployee('${emp.id}')"><i class="fa-regular fa-pen-to-square"></i></button>
+          <button class="btn btn-ghost" onclick="removeEmployee('${emp.id}')"><i class="fa-regular fa-trash-can"></i></button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function openEmployeeModal(){ document.getElementById('employeeModal').style.display='flex'; document.getElementById('employeeModal').setAttribute('aria-hidden','false'); document.getElementById('empModalTitle').textContent='Add Employee'; document.getElementById('employeeForm').reset(); document.getElementById('empName').focus(); }
+  function closeEmployeeModal(){ document.getElementById('employeeModal').style.display='none'; document.getElementById('employeeModal').setAttribute('aria-hidden','true'); }
+
+  document.getElementById('employeeForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    const idVal = document.getElementById('empId').value || id();
+    const obj = {
+      id: idVal,
+      name: document.getElementById('empName').value.trim(),
+      role: document.getElementById('empRole').value.trim(),
+      email: document.getElementById('empEmail').value.trim(),
+      phone: document.getElementById('empPhone').value.trim(),
+      salary: Number(document.getElementById('empSalary').value || 0),
+      taxRate: Number(document.getElementById('empTax').value || 0),
+      status: document.getElementById('empStatus').value,
+      lastPaid: (employees.find(x=>x.id===idVal) || {}).lastPaid || null
+    };
+    const idx = employees.findIndex(e=>e.id===idVal);
+    if(idx>=0) employees[idx]=obj; else employees.unshift(obj);
+    save(EMP_KEY, employees);
+    renderEmployees(); updateStats();
+    closeEmployeeModal();
+  });
+
+  function editEmployee(idVal){
+    const emp = employees.find(e=>e.id===idVal); if(!emp) return alert('Employee not found');
+    document.getElementById('employeeModal').style.display='flex'; document.getElementById('employeeModal').setAttribute('aria-hidden','false');
+    document.getElementById('empModalTitle').textContent='Edit Employee';
+    document.getElementById('empId').value = emp.id;
+    document.getElementById('empName').value = emp.name;
+    document.getElementById('empRole').value = emp.role;
+    document.getElementById('empEmail').value = emp.email;
+    document.getElementById('empPhone').value = emp.phone;
+    document.getElementById('empSalary').value = emp.salary;
+    document.getElementById('empTax').value = emp.taxRate;
+    document.getElementById('empStatus').value = emp.status;
+  }
+
+  function removeEmployee(idVal){
+    if(!confirm('Delete employee?')) return;
+    employees = employees.filter(e=>e.id!==idVal);
+    save(EMP_KEY, employees);
+    renderEmployees(); updateStats();
+  }
+
+  /* =========================
+     Payroll runs: compute payslips
+     ========================= */
+  function openRunModal(){ document.getElementById('runModal').style.display='flex'; document.getElementById('runModal').setAttribute('aria-hidden','false'); document.getElementById('runForm').reset(); document.getElementById('runName').value = `Payroll ${new Date().toLocaleDateString()}`; document.getElementById('runPeriod').value = new Date().toISOString().slice(0,7); }
+  function closeRunModal(){ document.getElementById('runModal').style.display='none'; document.getElementById('runModal').setAttribute('aria-hidden','true'); }
+
+  document.getElementById('runForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    const run = {
+      id: 'r_'+Math.random().toString(36).slice(2,9),
+      name: document.getElementById('runName').value || `Payroll ${new Date().toLocaleDateString()}`,
+      period: document.getElementById('runPeriod').value || new Date().toISOString().slice(0,7),
+      notes: document.getElementById('runNotes').value || '',
+      createdAt: new Date().toISOString(),
+      adjustments: {
+        bonus: Number(document.getElementById('globalBonus').value || 0),
+        deduction: Number(document.getElementById('globalDeduct').value || 0)
+      },
+      payslips: []
+    };
+
+    // compute payslip for each active employee
+    employees.forEach(emp=>{
+      if(emp.status !== 'active') return; // skip non-active
+      const gross = Number(emp.salary || 0) + run.adjustments.bonus;
+      const tax = +(gross * (emp.taxRate || 0) / 100).toFixed(2);
+      const deductions = run.adjustments.deduction;
+      const net = +(gross - tax - deductions).toFixed(2);
+      const slip = {
+        id: 'p_'+Math.random().toString(36).slice(2,9),
+        empId: emp.id,
+        name: emp.name,
+        role: emp.role,
+        gross, tax, deductions, net,
+        period: run.period,
+        createdAt: new Date().toISOString()
+      };
+      run.payslips.push(slip);
+      // update lastPaid for employee (simple)
+      const idx = employees.findIndex(e=>e.id===emp.id);
+      if(idx>=0) employees[idx].lastPaid = new Date().toISOString().slice(0,10);
+    });
+
+    // store
+    runs.unshift(run);
+    save(RUN_KEY, runs);
+    save(EMP_KEY, employees);
+    renderRuns();
+    renderEmployees();
+    updateStats();
+    renderRecentPayments();
+    closeRunModal();
+    alert('Payroll run created with ' + run.payslips.length + ' payslips.');
+  });
+
+  /* =========================
+     Render runs & details
+     ========================= */
+  function renderRuns(){
+    runs = load(RUN_KEY);
+    const cont = document.getElementById('runsList');
+    cont.innerHTML = '';
+    runs.slice(0,6).forEach(r=>{
+      const el = document.createElement('div');
+      el.style.display='flex'; el.style.justifyContent='space-between'; el.style.alignItems='center'; el.style.padding='8px'; el.style.borderRadius='8px'; el.style.background='linear-gradient(90deg, rgba(2,6,23,0.02), rgba(2,6,23,0.01))';
+      el.innerHTML = `<div><strong>${escape(r.name)}</strong><div class="small-muted">${r.period} • ${r.payslips.length} payslips</div></div>
+                      <div style="display:flex;gap:8px">
+                        <button class="btn btn-ghost" onclick="viewRun('${r.id}')"><i class="fa-regular fa-eye"></i></button>
+                        <button class="btn btn-ghost" onclick="exportRun('${r.id}')"><i class="fa-solid fa-file-export"></i></button>
+                      </div>`;
+      cont.appendChild(el);
+    });
+  }
+
+  function viewRun(idVal){
+    const r = runs.find(r=>r.id===idVal); if(!r) return alert('Run not found');
+    // show run payslips in a simple new window/pop-up (or modal)
+    const w = window.open('', '_blank', 'width=900,height=600');
+    const html = renderRunHTML(r);
+    w.document.write(html);
+    w.document.close();
+  }
+
+  function renderRunHTML(r){
+    const rows = r.payslips.map(s=>`<tr><td>${escape(s.name)}</td><td>${escape(s.role)}</td><td>EGP ${s.gross.toLocaleString()}</td><td>EGP ${s.tax.toLocaleString()}</td><td>EGP ${s.deductions.toLocaleString()}</td><td>EGP ${s.net.toLocaleString()}</td></tr>`).join('');
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${escape(r.name)}</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px}th{background:#f4f4f4}</style></head><body><h2>${escape(r.name)}</h2><div>${escape(r.period)} • ${r.payslips.length} payslips</div><table><thead><tr><th>Employee</th><th>Role</th><th>Gross</th><th>Tax</th><th>Deductions</th><th>Net</th></tr></thead><tbody>${rows}</tbody></table><p style="margin-top:12px">${escape(r.notes)}</p></body></html>`;
+  }
+
+  function exportRun(idVal){
+    const r = runs.find(r=>r.id===idVal); if(!r) return;
+    const rows = [['Employee','Role','Gross','Tax','Deductions','Net','Period']];
+    r.payslips.forEach(s => rows.push([s.name,s.role,s.gross,s.tax,s.deductions,s.net,s.period]));
+    const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=`payroll_${r.period}.csv`; a.click(); URL.revokeObjectURL(url);
+  }
+
+  /* =========================
+     Stats & recent payments
+     ========================= */
+  function updateStats(){
+    runs = load(RUN_KEY);
+    employees = load(EMP_KEY);
+    const latest = runs[0] || {payslips:[]};
+    const total = latest.payslips.reduce((s,p)=>s + (p.gross||0),0);
+    const net = latest.payslips.reduce((s,p)=>s + (p.net||0),0);
+    const tax = latest.payslips.reduce((s,p)=>s + (p.tax||0),0);
+    const ded = latest.payslips.reduce((s,p)=>s + (p.deductions||0),0);
+    document.getElementById('statTotal').textContent = 'EGP ' + (total? total.toLocaleString(): '0');
+    document.getElementById('statNet').textContent = 'EGP ' + (net? net.toLocaleString(): '0');
+    document.getElementById('statTax').textContent = 'EGP ' + (tax? tax.toLocaleString(): '0');
+    document.getElementById('statDeduct').textContent = 'EGP ' + (ded? ded.toLocaleString(): '0');
+    renderSummary();
+  }
+
+  function renderRecentPayments(){
+    runs = load(RUN_KEY);
+    const list = document.getElementById('recentPayments'); list.innerHTML = '';
+    const recent = runs.flatMap(r => r.payslips.map(p=>({...p, runName:r.name, runPeriod:r.period})));
+    recent.slice(0,6).forEach(p=>{
+      const el = document.createElement('div');
+      el.style.display='flex'; el.style.justifyContent='space-between'; el.style.alignItems='center'; el.style.padding='8px'; el.style.borderRadius='8px'; el.style.background='linear-gradient(90deg, rgba(2,6,23,0.02), rgba(2,6,23,0.01))';
+      el.innerHTML = `<div><strong>${escape(p.name)}</strong><div class="small-muted">${p.runName} • ${p.runPeriod}</div></div><div style="font-weight:700">EGP ${p.net.toLocaleString()}</div>`;
+      list.appendChild(el);
+    });
+  }
+
+  function renderSummary(){
+    runs = load(RUN_KEY);
+    const latest = runs[0] || {payslips:[]};
+    const sum = document.getElementById('summaryList'); sum.innerHTML = '';
+    const totalEmployees = latest.payslips.length;
+    const avgNet = totalEmployees ? (latest.payslips.reduce((s,p)=>s + p.net,0) / totalEmployees).toFixed(2) : 0;
+    sum.innerHTML = `<div>Total employees paid: <strong>${totalEmployees}</strong></div><div>Average net: <strong>EGP ${Number(avgNet).toLocaleString()}</strong></div><div class="small-muted">Last run: ${(runs[0]||{}).name || '-'}</div>`;
+  }
+
+  /* =========================
+     Trend chart
+     ========================= */
+  let trendChart;
+  function initTrendChart(){
+    const ctx = document.getElementById('payrollTrend').getContext('2d');
+    const months = lastMonths(6);
+    const grossData = months.map(()=>randomInt(50000,120000));
+    const netData = grossData.map(g => Math.round(g * 0.78));
+    trendChart = new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels: months,
+        datasets:[
+          { label:'Gross', data:grossData, backgroundColor:'rgba(42,157,244,0.9)', borderRadius:6 },
+          { label:'Net', data:netData, backgroundColor:'rgba(34,197,94,0.9)', borderRadius:6 }
+        ]
+      },
+      options:{
+        responsive:true,
+        plugins:{ legend:{ position:'top' } },
+        scales:{ x:{ grid:{display:false} }, y:{ grid:{ color:'rgba(0,0,0,0.04)' } } }
+      }
+    });
+  }
+
+  function refreshTrend(){
+    if(!trendChart) return;
+    trendChart.data.datasets.forEach(ds => ds.data = ds.data.map(v => Math.round(v * (0.85 + Math.random()*0.3))));
+    trendChart.update();
+  }
+
+  /* =========================
+     Payslip preview & print
+     ========================= */
+  function viewPayslipPreview(empId){
+    // find last run payslip
+    runs = load(RUN_KEY);
+    const allPays = runs.flatMap(r => r.payslips.map(s=> ({...s, runName:r.name, runPeriod:r.period})));
+    const p = allPays.find(x=>x.empId === empId);
+    if(!p) return alert('No payslip found for this employee in runs yet.');
+    openPayslipPrint(p);
+  }
+
+  function openPayslipPrint(p){
+    const html = `
+      <!doctype html><html><head><meta charset="utf-8"><title>Payslip - ${escape(p.name)}</title>
+      <style>body{font-family:Arial;padding:24px;color:#111} .card{max-width:720px;margin:auto;border:1px solid #eee;padding:18px;border-radius:8px} h2{margin:4px 0} table{width:100%;border-collapse:collapse;margin-top:12px} td,th{padding:8px;border:1px solid #eee}</style>
+      </head><body><div class="card"><h2>Pay Slip</h2><div><strong>${escape(p.name)}</strong> — ${escape(p.role)}</div><div class="small-muted">${escape(p.runName)} • ${escape(p.runPeriod)}</div>
+      <table><tr><th>Description</th><th>Amount (EGP)</th></tr>
+      <tr><td>Gross salary</td><td>${p.gross.toLocaleString()}</td></tr>
+      <tr><td>Tax</td><td>${p.tax.toLocaleString()}</td></tr>
+      <tr><td>Deductions</td><td>${p.deductions.toLocaleString()}</td></tr>
+      <tr><th>Net pay</th><th>${p.net.toLocaleString()}</th></tr></table>
+      <p style="margin-top:12px">Generated: ${new Date(p.createdAt).toLocaleString()}</p>
+      </div><script>window.onload=function(){ window.print(); }`;
+    const f = document.getElementById('printFrame');
+    const doc = f.contentWindow.document;
+    doc.open(); doc.write(html); doc.close();
+    // frame will call print automatically
+  }
+
+  /* =========================
+     Exports & utilities
+     ========================= */
+  function exportEmployees(){
+    employees = load(EMP_KEY);
+    const rows = [['id','name','role','email','phone','salary','taxRate','status','lastPaid']];
+    employees.forEach(e => rows.push([e.id,e.name,e.role,e.email,e.phone,e.salary,e.taxRate,e.status,e.lastPaid]));
+    const csv = rows.map(r => r.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'employees.csv'; a.click(); URL.revokeObjectURL(url);
+  }
+
+  function exportPayroll(){
+    runs = load(RUN_KEY);
+    if(runs.length===0) return alert('No payroll runs to export');
+    const latest = runs[0];
+    exportRun(latest.id);
+  }
+
+  /* =========================
+     Small UI helpers & boot wire
+     ========================= */
+  function wireEvents(){
+    document.getElementById('globalSearch').addEventListener('input', ()=>renderEmployees());
+    document.getElementById('filterStatus').addEventListener('input', ()=>renderEmployees());
+    document.getElementById('newRunBtn').addEventListener('click',()=>openRunModal());
+    document.getElementById('runsList').addEventListener('click',()=>{}); // placeholder
+    document.getElementById('newRunBtn').addEventListener('keydown', (e)=>{ if(e.key==='Enter') openRunModal(); });
+    // open employee form when clicking Add Employee in top
+    document.getElementById('addEmployeeBtn')?.addEventListener('click', openEmployeeModal);
+  }
+
+  // small helpers
+  function escape(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function capitalize(s){ return String(s||'').charAt(0).toUpperCase() + String(s||'').slice(1); }
+  function lastMonths(n){ const months=[]; const d = new Date(); for(let i=0;i<n;i++){ months.unshift(new Date(d.getFullYear(), d.getMonth()-i, 1).toLocaleString('en',{month:'short',year:'numeric'}).replace(' ',' ')); } return months; }
+  function randomInt(a,b){ return Math.round(a + Math.random()*(b-a)); }
+
+  // placeholder to view runs manager
+  function openRunsManager(){ alert('Open runs manager (to be implemented)'); }
+
+  /* =========================
+     initial state update
+     ========================= */
+  function renderRecentPaymentsOnLoad(){ renderRecentPayments(); }
+  renderRecentPaymentsOnLoad();
+
+  // expose open run modal
+  window.openRunsManager = openRunsManager;
+  window.openEmployeeModal = openEmployeeModal;
+  window.viewPayslipPreview = viewPayslipPreview;
+
+  // optional: theme toggle
+  function toggleTheme(){
+    const dt = document.documentElement;
+    const current = dt.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    dt.setAttribute('data-theme', next);
+    localStorage.setItem('bf_theme', next);
+    document.getElementById('themeToggle').innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  }
+
+</script>
+</body>
+</html>

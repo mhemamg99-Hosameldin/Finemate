@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlueFactory — Multi-Currency & Exchange Rates</title>
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --blue-900: #0b3d91;
+      --blue-700: #1464c9;
+      --blue-500: #2a9df4;
+      --muted: #6b7280;
+      --panel: #ffffff;
+      --bg: #f4f7fb;
+      --glass: rgba(255,255,255,0.6);
+    }
+    [data-theme="dark"]{
+      --bg: #0f1724;
+      --panel: #111827;
+      --muted: #9ca3af;
+      --blue-900: #071733;
+      --blue-700: #0a3a6b;
+      --blue-500: #1f6fb3;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg), #e9f2ff 300px);
+      color:#0b1220;
+      min-height:100vh;
+      transition: .25s;
+    }
+
+    .app{ display:flex; min-height:100vh; }
+    .sidebar{
+      width:260px;
+      background: linear-gradient(180deg,var(--blue-900), var(--blue-700));
+      color:#fff; padding:18px; display:flex; flex-direction:column; gap:18px; position:fixed; left:0; top:0; bottom:0;
+      box-shadow: 0 6px 24px rgba(10,25,60,0.12);
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; }
+    .brand i{ font-size:1.35rem }
+    .nav-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; overflow-y:auto; padding-right:5px; }
+    .nav-links::-webkit-scrollbar{ width:6px }
+    .nav-links::-webkit-scrollbar-thumb{ background:#ccc; border-radius:4px }
+    .nav-link{
+      display:flex; align-items:center; gap:12px; padding:10px; border-radius:10px; color:rgba(255,255,255,0.95); text-decoration:none;
+      font-weight:600; font-size:0.95rem;
+    }
+    .nav-link:hover, .nav-link.active{ background: rgba(255,255,255,0.06); transform:translateX(6px); }
+    .sidebar-footer{ margin-top:auto; font-size:.85rem; color:rgba(255,255,255,0.85) }
+
+    .main{ margin-left:260px; padding:24px; width:calc(100% - 260px); transition:.3s; }
+
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+    .search{ flex:1; max-width:540px; display:flex; gap:8px; align-items:center; }
+    .search input{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,0.06); background:var(--panel) }
+    .controls{ display:flex; gap:10px; align-items:center; }
+
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; cursor:pointer; border:none; font-weight:600; }
+    .btn-primary{ background:linear-gradient(90deg,var(--blue-700),var(--blue-500)); color:#fff; box-shadow: 0 8px 18px rgba(42,157,244,0.14); }
+    .btn-ghost{ background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--muted); padding:8px 10px; border-radius:10px }
+    .icon-btn{ background:var(--panel); padding:8px; border-radius:10px; border:1px solid rgba(15,23,42,0.05) }
+
+    .grid{ display:grid; grid-template-columns: repeat(12,1fr); gap:18px; align-items:start; }
+
+    .card{ background:var(--panel); border-radius:12px; padding:16px; box-shadow: 0 6px 20px rgba(16,24,40,0.04); transition: transform .28s; overflow:hidden; }
+    .card:hover{ transform: translateY(-6px); box-shadow: 0 16px 36px rgba(16,24,40,0.08); }
+
+    .stat{ grid-column: span 3; display:flex; gap:12px; align-items:center; }
+    .badge{ width:54px; height:54px; border-radius:12px; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg,var(--blue-500),var(--blue-700)); color:#fff; font-size:1.25rem; box-shadow: 0 6px 18px rgba(42,157,244,0.12); }
+    .stat h4{ margin:0; font-size:1.05rem }
+    .stat p{ margin:0; color:var(--muted); font-size:.9rem }
+
+    .chart-large{ grid-column: span 8; min-height:320px; display:flex; flex-direction:column; gap:12px; }
+    .chart-side{ grid-column: span 4; min-height:320px; }
+
+    .table-wrap{ overflow:auto; max-height:420px; }
+    table{ width:100%; border-collapse:collapse; font-size:.95rem; }
+    thead th{ text-align:left; color:var(--muted); font-weight:700; padding:10px 6px; font-size:.86rem; position: sticky; top:0; background:var(--panel); }
+    tbody tr{ transition: background .18s, transform .18s; border-bottom:1px solid rgba(0,0,0,0.04) }
+    tbody tr:hover{ background: linear-gradient(90deg, rgba(42,157,244,0.03), rgba(10,25,60,0.02)); transform: translateX(4px); }
+    td{ padding:12px 6px; vertical-align:middle }
+
+    .form-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .form-row .col{ flex:1; min-width:160px }
+
+    .page-footer{ text-align:center; padding:22px 0; color:var(--muted); margin-top:14px }
+
+    @media (max-width:1100px){
+      .stat{ grid-column: span 6 } .chart-large{ grid-column: span 12 } .chart-side{ grid-column: span 12 } .table-wrap{ max-height:320px }
+      .main{ margin-left:72px; width:calc(100% - 72px) }
+      .sidebar{ width:72px }
+      .brand span{ display:none }
+    }
+
+    @keyframes popIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+    .card{ animation: popIn .45s ease both }
+    .muted{ color:var(--muted) }
+    .small{ font-size:.85rem }
+    .pill{ padding:6px 10px; border-radius:999px; background:#f1f5f9; color:var(--muted); font-weight:700 }
+    .success{ color:#0b6623 }
+    .danger{ color:#b91c1c }
+    .warning{ color:#f97316 }
+
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="app" id="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand"><i class="fa-solid fa-industry"></i><span>FinMate</span></div>
+
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="dashboard.html" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+      <a href="Invoices.html" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</a>
+      <a href="Inventory.html" class="nav-link"><i class="fa-solid fa-boxes-stacked"></i> Inventory</a>
+      <a href="Reports.html" class="nav-link"><i class="fa-solid fa-chart-line"></i> Reports</a>
+      <a href="suppliers.html" class="nav-link"><i class="fa-solid fa-truck-field"></i> Suppliers </a>
+      <a href="Chart of Accounts.html" class="nav-link"><i class="fa-solid fa-book"></i> Chart of Accounts </a>
+      <a href="Journal Entries.html" class="nav-link"><i class="fa-solid fa-clipboard-list"></i> Journal Entries </a>
+      <a href="Customers.html" class="nav-link"><i class="fa-solid fa-user-tie"></i> Customers</a>
+      <a href="Purchase Orders.html" class="nav-link"><i class="fa-solid fa-file-circle-check"></i> Purchase Orders</a>
+      <a href="Sales Orders.html" class="nav-link"><i class="fa-solid fa-file-contract"></i> Sales Orders</a>
+      <a href="Payments.html" class="nav-link"><i class="fa-solid fa-money-bill-transfer"></i> Payments</a>
+      <a href="Payroll.html" class="nav-link"><i class="fa-solid fa-money-check-dollar"></i> Payroll</a>
+      <a href="Tax Management.html" class="nav-link"><i class="fa-solid fa-receipt"></i> Tax Management</a>
+      <a href="Assets Management.html" class="nav-link"><i class="fa-solid fa-building-columns"></i> Assets Management</a>
+      <a href="Audit Logs.html" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Audit Logs</a>
+      <a href="Multi-Currency & Exchange Rates.html" class="nav-link"><i class="fa-solid fa-coins"></i> Multi-Currency & Exchange Rates</a>
+      <a href="Notifications Center.html" class="nav-link"><i class="fa-solid fa-bell"></i> Notifications Center</a>
+      <a href="Settings.html" class="nav-link"><i class="fa-solid fa-cogs"></i> Settings</a>
+    </nav>
+    
+
+    <div class="sidebar-footer">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-circle-info"></i></div>
+        <div>
+          <div style="font-weight:700">Factory #12</div>
+          <div style="font-size:.85rem;opacity:.9">Plan: Enterprise</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2 style="margin:0">Multi-Currency & Exchange Rates</h2>
+        <div style="color:var(--muted); font-size:.95rem">Manage currencies, live rates and conversion</div>
+      </div>
+
+      <div class="controls">
+        <div class="search">
+          <input id="globalSearch" placeholder="Search by code, name or status..." />
+        </div>
+        <button class="btn icon-btn" title="Refresh rates" id="refreshRates"><i class="fa-solid fa-arrows-rotate"></i></button>
+        <button class="btn icon-btn" id="themeToggle" title="Toggle dark mode"><i class="fa-regular fa-moon"></i></button>
+        <button class="btn btn-primary" id="openAddBtn"><i class="fa-solid fa-plus"></i> Add Currency</button>
+      </div>
+    </div>
+
+    <section class="grid">
+
+      <!-- Stat cards -->
+      <div class="stat card">
+        <div class="badge"><i class="fa-solid fa-coins"></i></div>
+        <div>
+          <h4 id="statCount">--</h4>
+          <p>Tracked Currencies</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#f97316,#f59e0b)"><i class="fa-solid fa-arrow-up-right-dots"></i></div>
+        <div>
+          <h4 id="statHigh">--</h4>
+          <p>Highest Rate (vs base)</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#34d399,#10b981)"><i class="fa-solid fa-arrow-down-right-dots"></i></div>
+        <div>
+          <h4 id="statLow">--</h4>
+          <p>Lowest Rate (vs base)</p>
+        </div>
+      </div>
+
+      <div class="stat card">
+        <div class="badge" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)"><i class="fa-solid fa-percent"></i></div>
+        <div>
+          <h4 id="statAvg">--</h4>
+          <p>Average Rate</p>
+        </div>
+      </div>
+
+      <!-- Big chart -->
+      <div class="chart-large card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>Currency Composition</strong>
+            <div class="muted small">Sizes approximate weight (rate * holdings)</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-ghost" id="fetchLive">Fetch Live Rates</button>
+            <button class="btn btn-ghost" id="exportCSV">Export CSV</button>
+          </div>
+        </div>
+        <canvas id="compChart" style="width:100%;max-height:340px"></canvas>
+      </div>
+
+      <!-- Side controls & add form -->
+      <div class="chart-side card">
+        <strong>Quick Actions</strong>
+        <div class="muted small">You can bulk-update rates from exchangerate.host (free)</div>
+
+        <div style="margin-top:12px; display:flex; gap:8px; flex-direction:column">
+          <button class="btn btn-primary" id="bulkUpdateBtn"><i class="fa-solid fa-cloud-arrow-up"></i> Update All Rates (Live)</button>
+          <button class="btn btn-ghost" id="importBtn"><i class="fa-solid fa-file-import"></i> Import JSON</button>
+          <button class="btn btn-ghost" id="clearBtn"><i class="fa-solid fa-trash"></i> Clear All (dev)</button>
+        </div>
+
+        <hr/>
+
+        <strong>Add / Edit Currency</strong>
+        <form id="miniForm" style="margin-top:8px">
+          <div class="form-row">
+            <div class="col"><input id="cCode" placeholder="Code (USD)" class="form-control" /></div>
+            <div class="col"><input id="cName" placeholder="Name (US Dollar)" class="form-control" /></div>
+          </div>
+          <div class="form-row" style="margin-top:8px">
+            <div class="col"><input id="cRate" placeholder="Rate vs base (e.g. 30.5)" class="form-control" /></div>
+            <div class="col"><input id="cHoldings" placeholder="Holdings (optional)" class="form-control" /></div>
+          </div>
+          <div style="margin-top:8px; display:flex; gap:8px">
+            <button class="btn btn-primary" type="submit" id="miniSave">Save</button>
+            <button type="button" class="btn btn-ghost" id="miniReset">Reset</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Table -->
+      <div class="card" style="grid-column: span 12">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <strong>Tracked Currencies</strong>
+            <div class="muted small">Manage currency list and rates</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center">
+            <select id="baseSelector" class="btn btn-ghost">
+              <!-- base currency -->
+            </select>
+            <input id="filterInput" placeholder="Filter by code or name..." class="form-control" style="width:220px" />
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Rate (vs base)</th>
+                <th>Holdings</th>
+                <th>Converted (base)</th>
+                <th>Last Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="currencyTable">
+              <!-- dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <div class="page-footer">© 2025 BlueFactory — Multi-Currency Module</div>
+  </main>
+
+</div>
+
+<!-- Firebase v9 modular -->
+<script type="module">
+  // IMPORTANT: replace the firebaseConfig with your project's config
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, doc, setDoc, getDocs, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "REPLACE_ME",
+    authDomain: "REPLACE_ME",
+    projectId: "REPLACE_ME",
+    storageBucket: "REPLACE_ME",
+    messagingSenderId: "REPLACE_ME",
+    appId: "REPLACE_ME"
+  };
+
+  // Init Firebase and Firestore
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const currenciesCol = collection(db, "currencies");
+
+  // UI elements
+  const statCount = document.getElementById('statCount');
+  const statHigh = document.getElementById('statHigh');
+  const statLow = document.getElementById('statLow');
+  const statAvg = document.getElementById('statAvg');
+  const currencyTable = document.getElementById('currencyTable');
+  const baseSelector = document.getElementById('baseSelector');
+  const filterInput = document.getElementById('filterInput');
+  const globalSearch = document.getElementById('globalSearch');
+
+  // Mini form
+  const miniForm = document.getElementById('miniForm');
+  const cCode = document.getElementById('cCode');
+  const cName = document.getElementById('cName');
+  const cRate = document.getElementById('cRate');
+  const cHoldings = document.getElementById('cHoldings');
+  const miniReset = document.getElementById('miniReset');
+
+  // Chart
+  const compCtx = document.getElementById('compChart').getContext('2d');
+  let compChart;
+
+  // local cache
+  let currencies = []; // { id, code, name, rate, holdings, updatedAt }
+
+  // Utility: format currency number
+  function fmt(n){ return typeof n === 'number' ? n.toLocaleString() : n; }
+
+  // Render stats
+  function renderStats(){
+    const count = currencies.length;
+    statCount.textContent = count;
+    if(count === 0){ statHigh.textContent = '--'; statLow.textContent = '--'; statAvg.textContent = '--'; return; }
+    const rates = currencies.map(c => Number(c.rate || 0)).filter(Boolean);
+    if(rates.length === 0){ statHigh.textContent = '--'; statLow.textContent = '--'; statAvg.textContent = '--'; return; }
+    const high = Math.max(...rates);
+    const low = Math.min(...rates);
+    const avg = (rates.reduce((a,b)=>a+b,0)/rates.length);
+    statHigh.textContent = high.toFixed(4);
+    statLow.textContent = low.toFixed(4);
+    statAvg.textContent = avg.toFixed(4);
+  }
+
+  // Render table
+  function renderTable(list = currencies){
+    currencyTable.innerHTML = '';
+    list.forEach(c => {
+      const tr = document.createElement('tr');
+      const converted = (Number(c.holdings || 0) * Number(c.rate || 0)).toFixed(2);
+      tr.innerHTML = `
+        <td><strong>${c.code}</strong></td>
+        <td class="muted small">${c.name || ''}</td>
+        <td>${Number(c.rate || 0).toFixed(6)}</td>
+        <td>${fmt(Number(c.holdings || 0))}</td>
+        <td>$${fmt(Number(converted))}</td>
+        <td class="small muted">${c.updatedAt ? new Date(c.updatedAt).toLocaleString() : '-'}</td>
+        <td>
+          <button class="btn btn-ghost" data-id="${c.id}" data-act="edit">Edit</button>
+          <button class="btn btn-ghost" data-id="${c.id}" data-act="fetch">Live</button>
+          <button class="btn btn-ghost" data-id="${c.id}" data-act="del">Delete</button>
+        </td>
+      `;
+      currencyTable.appendChild(tr);
+    });
+    renderChart();
+  }
+
+  // Render chart
+  function renderChart(){
+    const labels = currencies.map(c => c.code);
+    const data = currencies.map(c => (Number(c.rate || 0) * Number(c.holdings || 0)) || Number(c.rate || 0));
+    const colors = ['#2a9df4','#17a2b8','#34d399','#f59e0b','#f97316','#7c3aed','#ef4444','#06b6d4'];
+    if(compChart) compChart.destroy();
+    compChart = new Chart(compCtx, {
+      type:'doughnut',
+      data:{
+        labels,
+        datasets:[{ data, backgroundColor: labels.map((_,i)=>colors[i % colors.length]) }]
+      },
+      options:{ plugins:{ legend:{ position:'bottom' } } }
+    });
+  }
+
+  // Create or update Firestore doc
+  async function saveCurrency(c){
+    // c must contain id for update
+    if(c.id){
+      const d = doc(db, "currencies", c.id);
+      await updateDoc(d, { code:c.code, name:c.name, rate: Number(c.rate), holdings: Number(c.holdings || 0), updatedAt: Date.now() });
+    }else{
+      await addDoc(currenciesCol, { code:c.code, name:c.name, rate: Number(c.rate), holdings: Number(c.holdings || 0), updatedAt: Date.now() });
+    }
+  }
+
+  // Delete doc
+  async function deleteCurrency(id){
+    await deleteDoc(doc(db, "currencies", id));
+  }
+
+  // Fetch live rate from exchangerate.host (base param)
+  async function fetchLiveRate(base = 'USD', target = 'EGP'){
+    // exchangerate.host API:
+    // https://api.exchangerate.host/convert?from=USD&to=EGP
+    const url = `https://api.exchangerate.host/convert?from=${base}&to=${target}`;
+    const res = await fetch(url);
+    const json = await res.json();
+    if(json && json.result) return json.result;
+    throw new Error('Failed to fetch rate');
+  }
+
+  // Bulk update rates using exchangerate.host latest (base currency selection)
+  async function bulkUpdate(base='USD'){
+    if(currencies.length === 0) return;
+    const codes = currencies.map(c => c.code).join(',');
+    // /latest?base=USD&symbols=EUR,GBP,...
+    const url = `https://api.exchangerate.host/latest?base=${base}&symbols=${codes}`;
+    const resp = await fetch(url);
+    const j = await resp.json();
+    if(j && j.rates){
+      const updates = [];
+      for(const c of currencies){
+        if(c.code === base) continue;
+        const r = j.rates[c.code];
+        if(typeof r === 'number'){
+          // find doc id
+          const d = doc(db, 'currencies', c.id);
+          updates.push(updateDoc(d, { rate: Number(r), updatedAt: Date.now() }));
+        }
+      }
+      await Promise.all(updates);
+      return true;
+    }
+    return false;
+  }
+
+  // Load currencies live from Firestore with snapshot (real-time)
+  onSnapshot(currenciesCol, (snap) => {
+    const arr = [];
+    snap.forEach(d => arr.push({ id:d.id, ...d.data() }));
+    currencies = arr.sort((a,b)=>a.code.localeCompare(b.code));
+    renderStats();
+    renderTable(applyFilter());
+    populateBaseSelect();
+  });
+
+  // Helpers for UI actions
+  function populateBaseSelect(){
+    baseSelector.innerHTML = '';
+    const baseOpt = document.createElement('option'); baseOpt.value='USD'; baseOpt.textContent = 'Base: USD (default)'; baseSelector.appendChild(baseOpt);
+    currencies.forEach(c=>{
+      const opt = document.createElement('option'); opt.value = c.code; opt.textContent = `Base: ${c.code}`;
+      baseSelector.appendChild(opt);
+    });
+  }
+
+  // Filter logic
+  function applyFilter(){
+    const q = (filterInput.value || globalSearch.value || '').trim().toLowerCase();
+    if(!q) return currencies;
+    return currencies.filter(c => (c.code + ' ' + (c.name||'') + (c.id||'')).toLowerCase().includes(q));
+  }
+
+  // Event listeners
+  document.getElementById('openAddBtn').addEventListener('click', ()=>{
+    // fill mini form with defaults
+    cCode.value = '';
+    cName.value = '';
+    cRate.value = '';
+    cHoldings.value = '';
+    cCode.focus();
+  });
+
+  miniForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const code = (cCode.value||'').toUpperCase().trim();
+    if(!code){ alert('Currency code required'); return; }
+    const obj = { code, name: cName.value.trim(), rate: Number(cRate.value) || 1, holdings: Number(cHoldings.value) || 0, updatedAt: Date.now() };
+    // if code exists update existing
+    const existing = currencies.find(x => x.code === code);
+    try{
+      if(existing){
+        // update existing
+        await saveCurrency({ id: existing.id, ...obj });
+      } else {
+        await saveCurrency(obj);
+      }
+      // reset
+      cCode.value=''; cName.value=''; cRate.value=''; cHoldings.value='';
+    }catch(err){ console.error(err); alert('Save failed') }
+  });
+
+  miniReset.addEventListener('click', ()=>{ cCode.value=''; cName.value=''; cRate.value=''; cHoldings.value=''; });
+
+  // Table button delegation
+  currencyTable.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const id = btn.dataset.id;
+    const act = btn.dataset.act;
+    const item = currencies.find(c=>c.id === id);
+    if(!item) return;
+    if(act === 'edit'){
+      // populate mini form for edit
+      cCode.value = item.code;
+      cName.value = item.name;
+      cRate.value = item.rate;
+      cHoldings.value = item.holdings;
+      // when saving, saveCurrency will detect code exists and update by id
+      // set a hidden field? we rely on detection by code above.
+    } else if(act === 'fetch'){
+      try{
+        const base = baseSelector.value || 'USD';
+        const live = await fetchLiveRate(base, item.code);
+        await saveCurrency({ id: item.id, code:item.code, name:item.name, rate: live, holdings: item.holdings });
+        alert(`Live rate ${base} → ${item.code}: ${live.toFixed(6)}`);
+      } catch(err){ console.error(err); alert('Live fetch failed'); }
+    } else if(act === 'del'){
+      if(confirm(`Delete ${item.code}?`)){
+        await deleteCurrency(id);
+      }
+    }
+  });
+
+  // Bulk update button
+  document.getElementById('bulkUpdateBtn').addEventListener('click', async ()=>{
+    const base = baseSelector.value || 'USD';
+    if(!confirm(`Update rates vs base ${base} using live API?`)) return;
+    try{
+      await bulkUpdate(base);
+      alert('Bulk update completed');
+    }catch(err){ console.error(err); alert('Bulk update failed'); }
+  });
+
+  // Fetch live single rate refresh
+  document.getElementById('fetchLive').addEventListener('click', async ()=>{
+    const base = baseSelector.value || 'USD';
+    try{
+      const url = `https://api.exchangerate.host/latest?base=${base}`;
+      const res = await fetch(url); const j = await res.json();
+      if(j && j.rates){
+        // show top rates example - update chart data only (not saving)
+        alert('Fetched live rates (not saved). Use "Update All Rates" to persist to Firestore.');
+      } else throw new Error('No data');
+    }catch(err){ console.error(err); alert('Fetch failed'); }
+  });
+
+  // Export CSV
+  document.getElementById('exportCSV').addEventListener('click', ()=>{
+    const rows = [['Code','Name','Rate','Holdings','UpdatedAt']];
+    currencies.forEach(c => rows.push([c.code, c.name || '', c.rate || '', c.holdings || '', c.updatedAt || '']));
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'currencies.csv'; a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // Import JSON (basic)
+  document.getElementById('importBtn').addEventListener('click', async ()=>{
+    const json = prompt('Paste JSON array of currencies (code,name,rate,holdings)'); 
+    if(!json) return;
+    try{
+      const arr = JSON.parse(json);
+      if(!Array.isArray(arr)) throw new Error('Not array');
+      for(const c of arr){
+        await addDoc(currenciesCol, { code:(c.code||'').toUpperCase(), name:c.name||'', rate:Number(c.rate)||1, holdings:Number(c.holdings)||0, updatedAt:Date.now() });
+      }
+      alert('Imported');
+    }catch(err){ console.error(err); alert('Import failed: '+err.message) }
+  });
+
+  // Clear all (dev)
+  document.getElementById('clearBtn').addEventListener('click', async ()=>{
+    if(!confirm('Clear ALL currencies from Firestore? (dev)')) return;
+    // warning: Firestore doesn't support delete many easily; here we iterate snapshot
+    const snap = await getDocs(currenciesCol);
+    const deletes = [];
+    snap.forEach(d => deletes.push(deleteDoc(doc(db, 'currencies', d.id))));
+    await Promise.all(deletes);
+    alert('Cleared');
+  });
+
+  // Search / filter
+  filterInput.addEventListener('input', ()=> renderTable(applyFilter()));
+  globalSearch.addEventListener('input', ()=> renderTable(applyFilter()));
+
+  // Refresh individual rates (small refresh button)
+  document.getElementById('refreshRates').addEventListener('click', async ()=>{
+    // quick fetch: re-calc stats and re-render from Firestore snapshot (it's real-time)
+    renderStats();
+    renderTable();
+    alert('Refreshed UI');
+  });
+
+  // Theme toggle
+  document.getElementById('themeToggle').addEventListener('click', ()=>{
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    // store preference
+    localStorage.setItem('bf_theme', next);
+    document.getElementById('themeToggle').innerHTML = next === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  });
+
+  // restore theme
+  (function(){
+    const saved = localStorage.getItem('bf_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved);
+    document.getElementById('themeToggle').innerHTML = saved === 'dark' ? '<i class="fa-regular fa-sun"></i>' : '<i class="fa-regular fa-moon"></i>';
+  })();
+
+  // Helper: apply text filter on current currencies and render
+  // (renderTable already uses applyFilter)
+  // Done above
+
+  // ---- Optional: when page loads, if no currencies exist, create some defaults (dev only) ----
+  (async function seedIfEmpty(){
+    const snap = await getDocs(currenciesCol);
+    if(snap.empty){
+      // seed few popular currencies
+      const seed = [
+        { code:'USD', name:'US Dollar', rate:1, holdings:0, updatedAt:Date.now() },
+        { code:'EUR', name:'Euro', rate:0.91, holdings:0, updatedAt:Date.now() },
+        { code:'EGP', name:'Egyptian Pound', rate:30.5, holdings:0, updatedAt:Date.now() },
+        { code:'GBP', name:'British Pound', rate:0.78, holdings:0, updatedAt:Date.now() }
+      ];
+      for(const s of seed) await addDoc(currenciesCol, s);
+    }
+  })();
+
+  // Small UI: show clicks for table buttons are handled via snapshot/handlers above
+
+  // End of module
+</script>
+
+</body>
+</html>
